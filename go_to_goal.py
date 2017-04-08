@@ -37,9 +37,6 @@ goal = (6,10,0)
 
 # map
 global grid, gui
-Map_filename = "map_arena.json"
-grid = CozGrid(Map_filename)
-gui = GUIWindow(grid)
 
 async def image_processing(robot):
 
@@ -142,102 +139,76 @@ def worldToGridCoords(worldCoord):
 async def run(robot: cozmo.robot.Robot):
 
     global flag_odom_init, last_pose
-    global grid, gui
 
-    # start streaming
-    robot.camera.image_stream_enabled = True
+    # Obtain odometry information
+    last_pose = robot.last_pose
+    current_odom = compute_odometry(robot.pose)
+    robot.last_pose = robot.pose
 
-    HEAD_ANGLE = 5
+    # Obtain list of currently seen markers and their poses
+    images = await image_processing(robot)
+    r_marker_list = cvt_2Dmarker_measurements(images)
+    # Update the particle filter using the above information
+    result = robot.pf.update(current_odom, r_marker_list)
 
-    await robot.set_head_angle(cozmo.util.degrees(HEAD_ANGLE)).wait_for_completed()
-    await robot.set_lift_height(-1, 10000).wait_for_completed()
+    # Determine the robot's action based on current state of localization system
+    # Then do the below.
+    converged = result[3]
+    if robot.played_goal_animation:
+        robot.stop_all_motors()
+    elif converged:
+        # Have the robot drive to the goal.
+        # Goal is defined w/ position & orientation
+        position = result[0:2]
+        rounded_position = tuple(int(position[i]) for i in range(len(position)))
+        angle = math.radians(result[2])
+        if robot.found_goal:
+            target_angle = 0
+        else:
+            target_angle = math.degrees(getTurnDirection(math.cos(angle), math.sin(angle), position, goal[0:2]))
+        at_goal = True
 
-    #start particle filter
-    pf = ParticleFilter(grid)
-
-    # The driving speed of the robot.
-    ROBOT_SPEED = 40
-    # The turn speed of the robot when turning.
-    TURN_SPEED = 20
-    # The acceleration of the robot.
-    ROBOT_ACCELERATION = 1000
-    # The amount of difference between the target and actual angles that the robot will tolerate when turning.
-    TURN_TOLERANCE = 20
-
-    goal_position = tuple(goal[0:2])
-
-    found_goal = False
-    played_goal_animation = False
-    played_angry_animation = False
-
-    last_pose = robot.pose
-    while True:
-        # Obtain odometry information
-        current_odom = compute_odometry(robot.pose)
-        last_pose = robot.pose
-
-        # Obtain list of currently seen markers and their poses
-        images = await image_processing(robot)
-        r_marker_list = cvt_2Dmarker_measurements(images)
-        # Update the particle filter using the above information
-        result = pf.update(current_odom, r_marker_list)
-
-        # Determine the robot's action based on current state of localization system
-        # Then do the below.
-        converged = result[3]
-        if played_goal_animation:
+        goal_position = tuple(goal[0:2])
+        for i in range(len(rounded_position)):
+            if abs(rounded_position[i] - goal_position[i]) > 1:
+                at_goal = False
+                break
+        if at_goal:
             robot.stop_all_motors()
-        elif converged:
-            # Have the robot drive to the goal.
-            # Goal is defined w/ position & orientation
-            position = result[0:2]
-            rounded_position = tuple(int(position[i]) for i in range(len(position)))
-            angle = math.radians(result[2])
-            if found_goal:
-                target_angle = 0
-            else:
-                target_angle = math.degrees(getTurnDirection(math.cos(angle), math.sin(angle), position, goal[0:2]))
-            at_goal = True
-            for i in range(len(rounded_position)):
-                if abs(rounded_position[i] - goal_position[i]) > 1:
-                    at_goal = False
-                    break
-            if at_goal:
-                robot.stop_all_motors()
-                await robot.turn_in_place(degrees(-result[2]), num_retries=3).wait_for_completed()
-                found_goal = True
-                if not played_goal_animation:
-                    # Then robot should play a happy animation, and stand still.
-                    await robot.say_text("Yay", play_excited_animation=True, duration_scalar=0.5, voice_pitch = 1).wait_for_completed()
-                    played_goal_animation = True
-            elif abs(target_angle) > TURN_TOLERANCE and abs(2 * math.pi - abs(target_angle)) > TURN_TOLERANCE:
-                robot.stop_all_motors()
-                await robot.turn_in_place(degrees(target_angle), num_retries=3).wait_for_completed()
-            else:
-                found_goal = False
-                await robot.drive_wheels(ROBOT_SPEED, ROBOT_SPEED, ROBOT_ACCELERATION, ROBOT_ACCELERATION)
+            await robot.turn_in_place(degrees(-result[2]), num_retries=3).wait_for_completed()
+            robot.found_goal = True
+            if not robot.played_goal_animation:
+                # Then robot should play a happy animation, and stand still.
+                await robot.say_text("Yay", play_excited_animation=True, duration_scalar=0.5, voice_pitch = 1).wait_for_completed()
+                robot.played_goal_animation = True
+        elif abs(target_angle) > robot.TURN_TOLERANCE and abs(2 * math.pi - abs(target_angle)) > robot.TURN_TOLERANCE:
+            robot.stop_all_motors()
+            await robot.turn_in_place(degrees(target_angle), num_retries=3).wait_for_completed()
         else:
-            # Have robot actively look around if localization has not converged.
-            await robot.drive_wheels(TURN_SPEED, -TURN_SPEED, ROBOT_ACCELERATION, ROBOT_ACCELERATION)
+            robot.found_goal = False
+            await robot.drive_wheels(robot.ROBOT_SPEED, robot.ROBOT_SPEED, robot.ROBOT_ACCELERATION, robot.ROBOT_ACCELERATION)
+    else:
+        # Have robot actively look around if localization has not converged.
+        await robot.drive_wheels(robot.TURN_SPEED, -robot.TURN_SPEED, robot.ROBOT_ACCELERATION, robot.ROBOT_ACCELERATION)
 
-        # Make code robust to "kidnapped robot problem"
-        # Reset localization if robot is picked up.
-        # Make robot unhappy.
-        if robot.is_picked_up:
-            pf.__init__(grid)
-            found_goal = False
-            played_goal_animation = False
-            if not played_angry_animation:
-                await play_angry(robot)
-            played_angry_animation = True
-            await robot.set_head_angle(cozmo.util.degrees(HEAD_ANGLE)).wait_for_completed()
-        else:
-            played_angry_animation = False
+    # Make code robust to "kidnapped robot problem"
+    # Reset localization if robot is picked up.
+    # Make robot unhappy.
+    if robot.is_picked_up:
+        robot.pf.__init__(robot.grid)
+        robot.found_goal = False
+        robot.played_goal_animation = False
+        if not robot.played_angry_animation:
+            await play_angry(robot)
+        robot.played_angry_animation = True
+        await robot.set_head_angle(cozmo.util.degrees(robot.HEAD_ANGLE)).wait_for_completed()
+    else:
+        robot.played_angry_animation = False
 
-        # Update the particle filter GUI for debugging
-        gui.show_particles(pf.particles)
-        gui.show_mean(*result)
-        gui.updated.set()
+    # Update the particle filter GUI for debugging
+    robot.gui.show_particles(robot.pf.particles)
+    robot.gui.show_mean(*result)
+    robot.gui.updated.set()
 
 def getTurnDirection(rotation_cos, rotation_sin, current, next):
     """
@@ -267,22 +238,3 @@ async def play_angry(robot):
     await robot.say_text("PUT ME DOWN", duration_scalar=1.5, voice_pitch=1, num_retries=2).wait_for_completed()
     await robot.set_lift_height(1, 10000).wait_for_completed()
     await robot.set_lift_height(-1, 10000).wait_for_completed()
-
-class CozmoThread(threading.Thread):
-    
-    def __init__(self):
-        threading.Thread.__init__(self, daemon=False)
-
-    def run(self):
-        cozmo.robot.Robot.drive_off_charger_on_connect = False  # Cozmo can stay on his charger
-        cozmo.run_program(run, use_viewer=False)
-
-
-if __name__ == '__main__':
-
-    # cozmo thread
-    cozmo_thread = CozmoThread()
-    cozmo_thread.start()
-
-    # init
-    gui.start()
