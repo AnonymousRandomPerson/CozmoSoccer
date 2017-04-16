@@ -5,17 +5,28 @@ import go_to_goal
 from grid import CozGrid
 from gui import GUIWindow
 
+from state_machine import State, StateMachine
+
 global grid, gui
 Map_filename = "map_arena.json"
 grid = CozGrid(Map_filename)
 gui = GUIWindow(grid)
 
 async def run(robot: cozmo.robot.Robot):
+    """
+    Causes the robot to play one-robot soccer.
+
+    Args:
+        robot: The robot to play soccer with.
+    """
     global grid, gui
     # start streaming
     robot.camera.image_stream_enabled = True
     robot.gui = gui
     robot.grid = grid
+
+    stateMachine = StateMachine(robot)
+    await stateMachine.changeState(go_to_goal.FindLocation())
 
     robot.HEAD_ANGLE = 5
 
@@ -41,14 +52,18 @@ async def run(robot: cozmo.robot.Robot):
     robot.last_pose = robot.pose
 
     while True:
-        await go_to_goal.run(robot)
+        await stateMachine.update()
+        #await go_to_goal.run(robot)
 
 class CozmoThread(threading.Thread):
+    """Thread for robot action execution."""
     
     def __init__(self):
+        """Initializes the thread."""
         threading.Thread.__init__(self, daemon=False)
 
     def run(self):
+        """Executes the thread."""
         cozmo.robot.Robot.drive_off_charger_on_connect = False  # Cozmo can stay on his charger
         cozmo.run_program(run, use_viewer=False)
 

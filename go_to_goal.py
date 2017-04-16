@@ -21,6 +21,7 @@ from particle_filter import *
 from utils import *
 from cozmo.util import degrees, radians
 
+from state_machine import State
 
 # camera params
 camK = np.matrix([[295, 0, 160], [0, 295, 120], [0, 0, 1]], dtype='float32')
@@ -238,3 +239,20 @@ async def play_angry(robot):
     await robot.say_text("PUT ME DOWN", duration_scalar=1.5, voice_pitch=1, num_retries=2).wait_for_completed()
     await robot.set_lift_height(1, 10000).wait_for_completed()
     await robot.set_lift_height(-1, 10000).wait_for_completed()
+
+class FindLocation(State):
+    """Localizes the robot with a particle filter."""
+
+    async def update(self, owner):
+        """
+        Executes the state's behavior for the current tick.
+
+        Args:
+            owner: The object to affect behavior for.
+        
+        Returns:
+            If the object's state should be changed, returns the class of the new state.
+            Otherwise, return None.
+        """
+        await run(owner)
+        return None

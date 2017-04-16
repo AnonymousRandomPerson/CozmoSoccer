@@ -18,10 +18,7 @@ try:
 except ImportError:
     sys.exit('run `pip3 install --user Pillow numpy` to run this example.')
 
-try:
-    from state_machine import State, StateMachine
-except ImportError:
-    sys.exit('run `pip3 install pyglet` to run this example.')
+from state_machine import State, StateMachine
 
 
 # Define a decorator as a subclass of Annotator; displays battery voltage
@@ -224,7 +221,8 @@ class Approach(State):
     _CLOSE_THRESHOLD *= 10
 
     def __init__(self, args=None):
-        """Initializes the state when it is first switched to.
+        """
+        Initializes the state when it is first switched to.
 
         Args:
             args: Whether Cozmo is approaching after previously hitting the ball.
@@ -234,7 +232,8 @@ class Approach(State):
         pass
 
     async def update(self, owner):
-        """Executes the state's behavior for the current tick.
+        """
+        Executes the state's behavior for the current tick.
 
         Args:
             owner: The object to affect behavior for.
@@ -303,11 +302,11 @@ class Approach(State):
 
 
 class HitBall(State):
-    """Moves Cozmo's arm to hit the ball.
-    """
+    """Moves Cozmo's arm to hit the ball."""
 
     async def update(self, owner):
-        """Executes the state's behavior for the current tick.
+        """
+        Executes the state's behavior for the current tick.
 
         Args:
             owner: The object to affect behavior for.
@@ -322,11 +321,11 @@ class HitBall(State):
 
 
 class BackUp(State):
-    """Backs up if too close to the ball.
-    """
+    """Backs up if too close to the ball."""
 
     def __init__(self, args):
-        """Initializes the state when it is first switched to.
+        """
+        Initializes the state when it is first switched to.
 
         Args:
             args: The distance to back up.
@@ -335,7 +334,8 @@ class BackUp(State):
         pass
 
     async def update(self, owner):
-        """Executes the state's behavior for the current tick.
+        """
+        Executes the state's behavior for the current tick.
 
         Args:
             owner: The object to affect behavior for.
