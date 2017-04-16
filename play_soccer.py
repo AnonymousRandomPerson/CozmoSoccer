@@ -1,7 +1,9 @@
 import cozmo
 import threading
+import time
 
 import go_to_goal
+import planning
 from grid import CozGrid
 from gui import GUIWindow
 
@@ -26,33 +28,108 @@ async def run(robot: cozmo.robot.Robot):
     robot.grid = grid
 
     robot.stateMachine = StateMachine(robot)
-    await robot.stateMachine.changeState(go_to_goal.FindLocation())
+    await robot.stateMachine.changeState(planning.PathPlan())
 
     robot.HEAD_ANGLE = 5
 
     await robot.set_head_angle(cozmo.util.degrees(robot.HEAD_ANGLE)).wait_for_completed()
-    await robot.set_lift_height(-1, 10000).wait_for_completed()
+    await robot.set_lift_height(0, 10000).wait_for_completed()
 
-    #start particle filter
+    # Start particle filter.
     robot.pf = go_to_goal.ParticleFilter(grid)
 
     # The driving speed of the robot.
     robot.ROBOT_SPEED = 40
     # The turn speed of the robot when turning.
     robot.TURN_SPEED = 20
+    # The yaw speed (degrees) of the robot when turning
+    robot.TURN_YAW = 1 / 55 * robot.TURN_SPEED * 2
     # The acceleration of the robot.
     robot.ROBOT_ACCELERATION = 1000
     # The amount of difference between the target and actual angles that the robot will tolerate when turning.
     robot.TURN_TOLERANCE = 20
 
+    # The length of the robot in mm.
+    robot.LENGTH = 90
+    # The width of the robot in mm.
+    robot.WIDTH = 55
+    # The maximum diagonal radius of the robot in mm.
+    robot.RADIUS = (robot.LENGTH ** 2 + robot.WIDTH ** 2) ** 0.5
+    # The radius of the ball in mm.
+    robot.BALL_RADIUS = 20
+
+    # Robot position in millimeters.
+    robot.position = [45, 27.5]
+    # Robot rotation in radians.
+    robot.rotation = 0
+    # The position of the robot in the previous frame.
+    robot.prev_position = robot.position
+    # The world position that the robot is trying to get to.
+    robot.target_position = None
+    # The world position of the goal.
+    robot.goal = None
+
+    # The world position of the ball.
+    robot.ball = None
+    # The previous world position of the ball.
+    robot.prev_ball = None
+
+    # The time on the previous frame.
+    robot.prev_time = time.time()
+    # The time (ms) since the previous frame.
+    robot.delta_time = 0
+
+    # Whether the robot has reached the goal.
     robot.found_goal = False
+    # Whether the robot has played an animation upon reaching the goal.
     robot.played_goal_animation = False
+    # Whether the robot has played an animation upon being picked upon.
     robot.played_angry_animation = False
-    
+
+    # Whether the robot was driving on the previous frame.
+    robot.was_driving = False
+    # Whether the robot was turning with drive_wheels on the previous frame.
+    robot.was_turning = False
+    # Cooldown (s) for keeping track of movement when the robot is starting to drive.
+    robot.DRIVE_COOLDOWN = 0
+    # Timer (s) for keeping track of movement when the robot is starting to drive.
+    robot.drive_timer = robot.DRIVE_COOLDOWN
+    # Threshold for ignoring small turns.
+    robot.TURN_THRESHOLD = 0.5
+
+    # The next grid cell that the robot is headed for.
+    robot.next_cell = None
+
+    # The robot's pose in the last frame.
     robot.last_pose = robot.pose
 
+    robot.ball = [100, 100]
+
     while True:
+        # Update the delta time since the last frame.
+        current_time = time.time()
+        robot.delta_time = current_time - robot.prev_time
+        robot.prev_time = current_time
+
+        robot.grid_position = robot.grid.worldToGridCoords(robot.position)
+        robot.prev_grid_position = robot.grid.worldToGridCoords(robot.prev_position)
+        robot.gui.show_mean(robot.grid_position[0], robot.grid_position[1], robot.rotation)
+        if robot.ball:
+            robot.ball_grid = robot.grid.worldToGridCoords(robot.ball)
+        else:
+            robot.ball_grid = None
+        if robot.prev_ball:
+            robot.prev_ball_grid = robot.grid.worldToGridCoords(robot.prev_ball)
+        else:
+            robot.prev_ball_grid = None
+
         await robot.stateMachine.update()
+
+        robot.prev_ball = robot.ball
+        robot.prev_position = robot.position
+        robot.last_pose = robot.pose
+
+        robot.gui.updated.set()
 
 class CozmoThread(threading.Thread):
     """Thread for robot action execution."""

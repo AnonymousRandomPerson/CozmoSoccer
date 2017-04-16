@@ -1,7 +1,7 @@
 import json
 import random
 import math
-
+import threading
 
 # grid map class
 class CozGrid:
@@ -13,8 +13,20 @@ class CozGrid:
             self.height = config['height']
             self.scale = config['scale']
 
+            # Initially empty private data, please access through functions below
+            self._start = None
+            self._goals = []
+            self._obstacles = []
+            self._visited = set()
+            self._newvisited = []
+            self._path = []
             self.occupied = []
             self.markers = []
+
+            # For coordination with visualization
+            self.lock = threading.Lock()
+            self.updated = threading.Event()
+            self.changes = []
 
             # . - empty square
             # O - occupied square
@@ -76,6 +88,247 @@ class CozGrid:
             x, y = self.random_place()
             if self.is_free(x, y):
                 return x, y
+
+    def checkPath(self):
+        """Checks if the current path is valid, and if so returns its length
+
+            Returns path length as a float if it is valid, -1.0 if it is invalid
+        """
+        
+        self.lock.acquire()
+        pathlen = 0.0
+        if len(self._path) > 1:
+            current = self._path[0]
+            for nextpoint in self._path[1:]:
+                neighbors = self.getNeighbors(current)
+                in_neighbors = False
+                for neighbor in neighbors:
+                    if neighbor[0] == nextpoint:
+                        pathlen += neighbor[1]
+                        in_neighbors = True
+                        break
+                if not in_neighbors:
+                    pathlen = -1.0
+                    break
+                current = nextpoint
+                
+        self.lock.release()
+        return pathlen
+
+    def coordInBounds(self, coord):
+        """Check if a set of coordinates is in the grid bounds
+
+            Arguments:
+            coord -- grid coordinates
+
+            Returns True if coord in bounds, else False
+        """
+        
+        x = coord[0]
+        y = coord[1]
+        if x >= 0 and y >= 0 and x < self.width and y < self.height:
+            return True
+
+
+    def addVisited(self, coord):
+        """Add a visited cell
+
+            Arguments:
+            coord -- grid coordinates of visited cell
+        """
+        
+        self.lock.acquire()
+        self._visited.add(coord)
+        self._newvisited.append(coord)
+        self.updated.set()
+        self.changes.append('visited')
+        self.lock.release()
+
+
+    def getVisited(self):
+        """Get the set of visited cells
+
+            Returns: set of coordinates of visited cells
+        """
+        
+        return self._visited
+
+
+    def clearVisited(self):
+        """Clear the set of visited cells
+        """
+        
+        self.lock.acquire()
+        self._visited = set()
+        self.updated.set()
+        self.changes.append('allvisited')
+        self.lock.release()
+
+
+    def addObstacle(self, coord):
+        """Add an obstacle cell
+
+            Arguments:
+            coord -- grid coordinates of obstacle cell
+        """
+        
+        self.lock.acquire()
+        self._obstacles.append(coord)
+        self.updated.set()
+        self.changes.append('obstacles')
+        self.lock.release()
+
+
+    def addObstacles(self, coords):
+        """Add multiple obstacle cells. Useful for marking large objects
+
+            Arguments:
+            coords -- list of grid coordinates of obstacle cells
+        """
+
+        self.lock.acquire()
+        self._obstacles += coords
+        self.updated.set()
+        self.changes.append('obstacles')
+        self.lock.release()
+
+
+    def clearObstacles(self):
+        """Clear list of obstacle cells
+        """
+        
+        self.lock.acquire()
+        self._obstacles = []
+        self.updated.set()
+        self.changes.append('obstacles')
+        self.lock.release()
+
+
+    def addGoal(self, coord):
+        """Add a goal cell
+
+            Arguments:
+            coord -- grid coordinates of goal cell
+        """
+        
+        self.lock.acquire()
+        self._goals.append(coord)
+        self.updated.set()
+        self.changes.append('goals')
+        self.lock.release()
+
+
+    def clearGoals(self):
+        """Clear the list of goal cells
+        """
+        
+        self.lock.acquire()
+        self._goals = []
+        self.updated.set()
+        self.changes.append('goals')
+        self.lock.release()
+
+
+    def getGoals(self):
+        """Get the list of goal cells
+
+            Returns list of grid coordinates of goal cells
+        """
+        
+        return self._goals
+
+
+    def setStart(self, coord):
+        """Set the start cell
+
+            Arguments:
+            coord -- grid coordinates of start cell
+        """
+        
+        self.lock.acquire()
+        self._start = coord
+        self.updated.set()
+        self.changes.append('start')
+        self.lock.release()
+
+
+    def clearStart(self):
+        """Clear the start cell
+        """
+        
+        self.lock.acquire()
+        self._start = None
+        self.updated.set()
+        self.changes.append('start')
+        self.lock.release()
+
+
+    def getStart(self):
+        """Get the start cell
+
+            Returns coordinates of start cell
+        """
+        
+        return self._start
+
+
+    def setPath(self, path):
+        """Set the path
+
+            Arguments:
+            path -- list of path coordinates
+        """
+
+        self.lock.acquire()
+        self._path = path
+        self.updated.set()
+        self.changes.append('path')
+        self.lock.release()
+
+
+    def getPath(self):
+        """Get the path
+
+            Returns list of path coordinates
+        """
+        
+        return self._path
+
+
+    def clearPath(self):
+        """Clear the path
+        """
+        
+        self.lock.acquire()
+        self._path = []
+        self.updated.set()
+        self.changes.append('path')
+        self.lock.release()
+
+    def worldToGridCoords(self, worldCoord):
+        """
+        Converts world coordinates to grid coordinates.
+
+        Args:
+            worldCoord: The world coordinates to convert to grid coordinates.
+
+        Returns:
+            The grid coordinates corresponding to the world coordinates
+            The grid's center if the coordinate is out of bounds.
+        """
+        gridCoord = tuple(np.divide(worldCoord, self.scale))
+        if self.coordInBounds(gridCoord):
+            return gridCoord
+        return getGridCenter()
+
+    def getGridCenter():
+        """
+        Gets the coordinates of the center of the grid.
+
+        Returns:
+            The coordinates of the center of the grid.
+        """
+        return (int(self.width / 2), int(self.height / 2))
 
 
 # parse marker position and orientation
