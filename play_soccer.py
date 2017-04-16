@@ -25,8 +25,8 @@ async def run(robot: cozmo.robot.Robot):
     robot.gui = gui
     robot.grid = grid
 
-    stateMachine = StateMachine(robot)
-    await stateMachine.changeState(go_to_goal.FindLocation())
+    robot.stateMachine = StateMachine(robot)
+    await robot.stateMachine.changeState(go_to_goal.FindLocation())
 
     robot.HEAD_ANGLE = 5
 
@@ -52,8 +52,7 @@ async def run(robot: cozmo.robot.Robot):
     robot.last_pose = robot.pose
 
     while True:
-        await stateMachine.update()
-        #await go_to_goal.run(robot)
+        await robot.stateMachine.update()
 
 class CozmoThread(threading.Thread):
     """Thread for robot action execution."""
