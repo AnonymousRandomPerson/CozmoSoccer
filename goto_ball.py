@@ -9,7 +9,7 @@ import sys
 
 import cozmo
 import cv2
-import find_ball
+import find_ball, find_goal
 import numpy as np
 from cozmo.util import Angle, degrees, distance_mm, speed_mmps
 
@@ -65,6 +65,10 @@ async def run(robot: cozmo.robot.Robot):
     robot.world.image_annotator.add_annotator('ball', BallAnnotator)
     robot.debug = False
 
+    # Camera settings
+    robot.camera.color_image_enabled = True
+    robot.camera.set_manual_exposure(10, 3.9)
+
     await robot.set_head_angle(degrees(-5), in_parallel = True).wait_for_completed()
     await robot.set_lift_height(1.0, in_parallel = True).wait_for_completed()
 
@@ -81,10 +85,12 @@ async def run(robot: cozmo.robot.Robot):
             event = await robot.world.wait_for(cozmo.camera.EvtNewRawCameraImage, timeout=30)
 
             # convert camera image to opencv format
-            robot.opencv_image = cv2.cvtColor(np.asarray(event.image), cv2.COLOR_RGB2GRAY)
+            robot.opencv_image = cv2.cvtColor(np.asarray(event.image), cv2.COLOR_RGB2BGR)
 
             # find the ball
-            ball = find_ball.find_ball(robot.opencv_image)
+            ball = find_ball.find_ball(cv2.cvtColor(np.asarray(event.image), cv2.COLOR_RGB2GRAY))
+            # @TODO Testing
+            goal = find_goal.find_goal(robot, robot.opencv_image)
 
             # set annotator ball
             if robot.debug:
@@ -154,7 +160,7 @@ class Search(State):
     """
 
     """The amount to turn each time the robot turns while searching for a ball."""
-    _TURN_SPEED = 50
+    _TURN_SPEED = 0
     """The direction that the robot will turn in."""
     _TURN_DIRECTION = 1
 
