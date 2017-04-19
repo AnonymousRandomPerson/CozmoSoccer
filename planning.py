@@ -16,6 +16,8 @@ from state_machine import State
 
 from utils import *
 
+import goto_ball
+
 def astar(grid, heuristic):
     """Perform the A* search algorithm on a defined grid
 
@@ -179,6 +181,7 @@ class PathPlan(State):
                 if abs(turn) > robot.TURN_THRESHOLD and abs(2 * math.pi - abs(turn)) > robot.TURN_THRESHOLD:
                     await robot.turn_in_place(radians(turn), num_retries=3).wait_for_completed()
                     robot.rotation += turn
+                    return goto_ball.Approach()
             else:
                 await robot.drive_wheels(robot.TURN_SPEED, -robot.TURN_SPEED, robot.ROBOT_ACCELERATION, robot.ROBOT_ACCELERATION)
                 robot.was_turning = True

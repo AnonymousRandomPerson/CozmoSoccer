@@ -13,6 +13,8 @@ import find_ball, find_goal
 import numpy as np
 from cozmo.util import Angle, degrees, distance_mm, speed_mmps
 
+import planning
+
 try:
     from PIL import ImageDraw, ImageFont
 except ImportError:
@@ -134,8 +136,11 @@ async def hitBall(robot):
     Args:
         robot: The object representing Cozmo.
     """
-    await robot.set_lift_height(0, 100, 100, in_parallel = True).wait_for_completed()
-    await robot.set_lift_height(1, 100, 100, in_parallel = True).wait_for_completed()
+    back_distance = robot._PHYSICAL_RADIUS * 20
+    await doActionWithTimeout(owner.drive_straight(distance_mm(back_distance), speed_mmps(1000), in_parallel = True), 1)
+    await doActionWithTimeout(owner.drive_straight(distance_mm(1.5 * back_distance), speed_mmps(1000), in_parallel = True), 1)
+    # await robot.set_lift_height(0, 100, 100, in_parallel = True).wait_for_completed()
+    # await robot.set_lift_height(1, 100, 100, in_parallel = True).wait_for_completed()
 
 
 class StateTemplate(State):
@@ -185,7 +190,7 @@ class Search(State):
         """
         if owner.ball:
             await owner.drive_wheels(0, 0, 500, 500)
-            return Approach()
+            return planning.PathPlan()
         turn_speed = self._TURN_SPEED * self._TURN_DIRECTION
         await owner.drive_wheels(turn_speed, -turn_speed, 500, 500)
 
@@ -321,9 +326,9 @@ class HitBall(State):
             If the object's state should be changed, returns the class of the new state.
             Otherwise, return None.
         """
-        await owner.drive_wheels(0, 0, 500, 500)
+        owner.stop_all_motors()
         await hitBall(owner)
-        return Approach(True)
+        return PathPlan()
 
 
 class BackUp(State):
