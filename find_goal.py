@@ -6,6 +6,8 @@ import copy
 
 import numpy as np
 
+from utils import *
+
 try:
     from PIL import Image, ImageDraw, ImageFont
 except ImportError:
@@ -22,7 +24,10 @@ def find_goal(robot, opencv_image, debug=True):
 
         Returns [x, y, area] of the goal, and None if no goal is found.
     """
-    cv2.waitKey(1)
+    show_gui = False
+
+    if show_gui:
+        cv2.waitKey(1)
     # Process Image
     robot.camera.set_manual_exposure(10, 3.9)
     opencv_image = cv2.bilateralFilter(opencv_image, 7, 50, 50)
@@ -31,7 +36,8 @@ def find_goal(robot, opencv_image, debug=True):
     #opencv_image = cv2.bitwise_and(opencv_image, opencv_image, mask = mask)
 
     canny_image = cv2.Canny(mask, 0, 50, apertureSize=3)
-    cv2.imshow('canny', canny_image)
+    if show_gui:
+        cv2.imshow('canny', canny_image)
     """
     lines = cv2.HoughLinesP(canny_image, 1, np.pi/180, 100, minLineLength=15, maxLineGap=25)
     print(lines)
@@ -47,7 +53,6 @@ def find_goal(robot, opencv_image, debug=True):
 
     # Keep top 10
     contours = sorted(contours, key=cv2.contourArea, reverse=True)[:10]
-
     for cnt in contours:
         cnt_len = cv2.arcLength(cnt, True)
         # Approximation precision @ 1%
@@ -70,23 +75,43 @@ def find_goal(robot, opencv_image, debug=True):
                 min_point = min(min_point, point, key=lambda p: p[0][0])
                 max_point = max(max_point, point, key=lambda p: p[0][0])
 
-            if find_angle(min_point, max_point) > 20:
+            min_point = min_point[0]
+            max_point = max_point[0]
+
+            angle = find_angle(min_point, max_point)
+            if angle > 20:
                 continue
 
-            x_1, y_1 = min_point[0][0], min_point[0][1]
-            x_2, y_2 = max_point[0][0], max_point[0][1]
+            x_1, y_1 = min_point[0], min_point[1]
+            x_2, y_2 = max_point[0], max_point[1]
+            
+            length = grid_distance(x_1, y_1, x_2, y_2)
+            midpoint = ((x_1 + x_2) / 2, (y_1 + y_2) / 2)
 
-            cv2.line(opencv_image, (x_1, y_1), (x_2, y_2), (0, 255, 0), 2)
-            #cv2.drawContours(opencv_image, [cnt], -1, (255, 0, 0), 1)
-            cv2.imshow('processed img', opencv_image)
-            # return [*center, 50]
+            image_width = len(robot.opencv_image[0])
+            pixel_center = image_width / 2
+            
+            direction_offset = (pixel_center - midpoint[0]) / pixel_center * robot.ANGLE_OF_VIEW / 2
+            goal_position = (robot.grid.width * robot.grid.scale, robot.grid.height * robot.grid.scale / 2)
+
+            angle_offset = 180 - angle
+            angle_rad = math.radians(angle)
+            position_offset = np.multiply((math.cos(angle_rad), math.sin(angle_rad)), direction_offset)
+            robot_position = np.add(position_offset, direction_offset)
+
+            if show_gui:
+                cv2.line(opencv_image, (x_1, y_1), (x_2, y_2), (0, 255, 0), 2)
+                cv2.drawContours(opencv_image, [cnt], -1, (255, 0, 0), 1)
+                cv2.imshow('processed img', opencv_image)
+            print(length, midpoint)
+            return robot_position
 
     return None
 
 
 def find_angle(p_1, p_2):
-    x_1, y_1 = p_1[0][0], p_1[0][1]
-    x_2, y_2 = p_2[0][0], p_2[0][1]
+    x_1, y_1 = p_1[0], p_1[1]
+    x_2, y_2 = p_2[0], p_2[1]
     return abs(np.rad2deg(np.arctan2(y_2 - y_1, x_2 - x_1)))
 
 

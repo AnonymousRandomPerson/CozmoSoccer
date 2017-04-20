@@ -35,6 +35,8 @@ def astar(grid, heuristic):
     if len(goals) == 0:
         return
     goal = goals[0]
+    if not goal or not init:
+        return
 
     # (totalDistance, node, previous, startDistance)
     queue.put((0, init, None, heuristic(init, goal)))
@@ -124,16 +126,14 @@ class PathPlan(State):
         changed = False
         if robot.ball:
             if robot.prev_ball:
-                ball_grid = robot.grid.worldToGridCoords(robot.ball)
-                ball_prev_grid = robot.grid.worldToGridCoords(robot.prev_ball)
-                changed = ball_grid != ball_prev_grid
+                robot.ball_grid = robot.grid.worldToGridCoords(robot.ball)
+                robot.ball_prev_grid = robot.grid.worldToGridCoords(robot.prev_ball)
+                changed = robot.ball_grid != robot.ball_prev_grid
             else:
                 changed = True
         
         if not changed and robot.prev_grid_position != robot.grid_position:
             changed = True
-
-        robot.target_position = (1, 1)
 
         if changed:
             robot.grid.clearObstacles()
@@ -226,6 +226,6 @@ def getGridPoints(x, y, robot):
         for j in scan:
             for corner in corners:
                 if grid_distance(roundedGrid[0] + i + corner[0], roundedGrid[1] + j + corner[1], x, y) > total_radius:
-                    points.add((i, j))
+                    points.append((i, j))
 
     return points

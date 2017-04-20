@@ -3,6 +3,7 @@ import threading
 import time
 
 import go_to_goal
+import goto_ball
 import planning
 from grid import CozGrid
 from gui import GUIWindow
@@ -12,7 +13,11 @@ from state_machine import State, StateMachine
 global grid, gui
 Map_filename = "map_arena.json"
 grid = CozGrid(Map_filename)
-gui = GUIWindow(grid)
+show_gui = False
+if show_gui:
+    gui = GUIWindow(grid)
+else:
+    gui = None
 
 async def run(robot: cozmo.robot.Robot):
     """
@@ -21,22 +26,62 @@ async def run(robot: cozmo.robot.Robot):
     Args:
         robot: The robot to play soccer with.
     """
-    global grid, gui
+    await initialize_robot(robot)
+
     # start streaming
     robot.camera.image_stream_enabled = True
-    robot.gui = gui
-    robot.grid = grid
 
     robot.stateMachine = StateMachine(robot)
-    await robot.stateMachine.changeState(planning.PathPlan())
-
-    robot.HEAD_ANGLE = 5
+    await robot.stateMachine.changeState(goto_ball.Search())
 
     await robot.set_head_angle(cozmo.util.degrees(robot.HEAD_ANGLE)).wait_for_completed()
     await robot.set_lift_height(0, 10000).wait_for_completed()
 
     # Start particle filter.
     robot.pf = go_to_goal.ParticleFilter(grid)
+
+    while True:
+        # Update the delta time since the last frame.
+        current_time = time.time()
+        robot.delta_time = current_time - robot.prev_time
+        robot.prev_time = current_time
+
+        robot.grid_position = robot.grid.worldToGridCoords(robot.position)
+        robot.prev_grid_position = robot.grid.worldToGridCoords(robot.prev_position)
+        if robot.gui:
+            robot.gui.show_mean(robot.grid_position[0], robot.grid_position[1], robot.rotation)
+
+        if robot.ball:
+            robot.ball_grid = robot.grid.worldToGridCoords(robot.ball)
+        else:
+            robot.ball_grid = None
+        if robot.prev_ball:
+            robot.prev_ball_grid = robot.grid.worldToGridCoords(robot.prev_ball)
+        else:
+            robot.prev_ball_grid = None
+
+        await robot.stateMachine.update()
+
+        robot.prev_ball = robot.ball
+        robot.prev_position = robot.position
+        robot.last_pose = robot.pose
+
+        if robot.gui:
+            robot.gui.updated.set()
+
+async def initialize_robot(robot):
+    """
+    Initializes fields for the robot.
+
+    Args:
+        robot: The robot to initialize fields for.
+    """
+    global grid, gui
+    robot.gui = gui
+    robot.grid = grid
+
+    # The angle that the robot's head faces.
+    robot.HEAD_ANGLE = 5
 
     # The driving speed of the robot.
     robot.ROBOT_SPEED = 40
@@ -57,6 +102,9 @@ async def run(robot: cozmo.robot.Robot):
     robot.RADIUS = (robot.LENGTH ** 2 + robot.WIDTH ** 2) ** 0.5
     # The radius of the ball in mm.
     robot.BALL_RADIUS = 20
+
+    # The horizontal angle of view of the robot's camera (in degrees).
+    robot.ANGLE_OF_VIEW = 60
 
     # Robot position in millimeters.
     robot.position = [45, 27.5]
@@ -103,33 +151,14 @@ async def run(robot: cozmo.robot.Robot):
     # The robot's pose in the last frame.
     robot.last_pose = robot.pose
 
-    robot.ball = [100, 100]
-
-    while True:
-        # Update the delta time since the last frame.
-        current_time = time.time()
-        robot.delta_time = current_time - robot.prev_time
-        robot.prev_time = current_time
-
-        robot.grid_position = robot.grid.worldToGridCoords(robot.position)
-        robot.prev_grid_position = robot.grid.worldToGridCoords(robot.prev_position)
-        robot.gui.show_mean(robot.grid_position[0], robot.grid_position[1], robot.rotation)
-        if robot.ball:
-            robot.ball_grid = robot.grid.worldToGridCoords(robot.ball)
-        else:
-            robot.ball_grid = None
-        if robot.prev_ball:
-            robot.prev_ball_grid = robot.grid.worldToGridCoords(robot.prev_ball)
-        else:
-            robot.prev_ball_grid = None
-
-        await robot.stateMachine.update()
-
-        robot.prev_ball = robot.ball
-        robot.prev_position = robot.position
-        robot.last_pose = robot.pose
-
-        robot.gui.updated.set()
+    # The current grid position of the ball.
+    robot.ball_grid = (0, 0)
+    # The previous grid position of the ball.
+    robot.prev_ball_grid = (0, 0)
+    # The current grid position of the robot.
+    robot.grid_position = (0, 0)
+    # The previous grid position of the robot.
+    robot.prev_grid_position = (0, 0)
 
 class CozmoThread(threading.Thread):
     """Thread for robot action execution."""
@@ -150,4 +179,5 @@ if __name__ == '__main__':
     cozmo_thread.start()
 
     # init
-    gui.start()
+    if gui:
+        gui.start()

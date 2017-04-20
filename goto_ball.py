@@ -14,6 +14,7 @@ import numpy as np
 from cozmo.util import Angle, degrees, distance_mm, speed_mmps
 
 import planning
+import play_soccer
 
 try:
     from PIL import ImageDraw, ImageFont
@@ -58,6 +59,7 @@ class BallAnnotator(cozmo.annotate.Annotator):
 
 async def run(robot: cozmo.robot.Robot):
     '''The run method runs once the Cozmo SDK is connected.'''
+    await play_soccer.initialize_robot(robot)
 
     # add annotators for battery level and ball bounding box
     stateMachine = StateMachine(robot)
@@ -188,11 +190,22 @@ class Search(State):
             If the object's state should be changed, returns the class of the new state.
             Otherwise, return None.
         """
+        robot = owner
+        event = await robot.world.wait_for(cozmo.camera.EvtNewRawCameraImage, timeout=30)
+
+        # convert camera image to opencv format
+        robot.opencv_image = cv2.cvtColor(np.asarray(event.image), cv2.COLOR_RGB2BGR)
+
+        # find the ball
+        ball = find_ball.find_ball(cv2.cvtColor(np.asarray(event.image), cv2.COLOR_RGB2GRAY))
+        # @TODO Testing
+        goal = find_goal.find_goal(robot, robot.opencv_image)
+
         if owner.ball:
             await owner.drive_wheels(0, 0, 500, 500)
             return planning.PathPlan()
         turn_speed = self._TURN_SPEED * self._TURN_DIRECTION
-        await owner.drive_wheels(turn_speed, -turn_speed, 500, 500)
+        #await owner.drive_wheels(turn_speed, -turn_speed, 500, 500)
 
 
 class Approach(State):
@@ -240,7 +253,6 @@ class Approach(State):
         """
         self.ballTimer = self._BALL_TIMEOUT
         self.didHitBall = args
-        pass
 
     async def update(self, owner):
         """

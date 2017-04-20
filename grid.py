@@ -2,6 +2,7 @@ import json
 import random
 import math
 import threading
+import numpy as np
 
 # grid map class
 class CozGrid:
