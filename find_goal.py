@@ -4,6 +4,7 @@ import cv2
 import sys
 import copy
 
+import math
 import numpy as np
 
 from utils import *
@@ -86,24 +87,35 @@ def find_goal(robot, opencv_image, debug=True):
             x_2, y_2 = max_point[0], max_point[1]
             
             length = grid_distance(x_1, y_1, x_2, y_2)
+            if length == 0:
+                continue
             midpoint = ((x_1 + x_2) / 2, (y_1 + y_2) / 2)
 
             image_width = len(robot.opencv_image[0])
             pixel_center = image_width / 2
             
-            direction_offset = (pixel_center - midpoint[0]) / pixel_center * robot.ANGLE_OF_VIEW / 2
+            side_offset = (pixel_center - midpoint[0]) / pixel_center * robot.ANGLE_OF_VIEW / 2
+            front_offset = pixel_center / length * robot.GOAL_LENGTH / robot.TAN_ANGLE - robot.LENGTH / 2 - robot.CAMERA_OFFSET
             goal_position = (robot.grid.width * robot.grid.scale, robot.grid.height * robot.grid.scale / 2)
 
-            angle_offset = 180 - angle
-            angle_rad = math.radians(angle)
-            position_offset = np.multiply((math.cos(angle_rad), math.sin(angle_rad)), direction_offset)
-            robot_position = np.add(position_offset, direction_offset)
+            angle_offset = 180 - angle ** 2 / 810
+            angle_rad = math.radians(angle_offset)
+
+            front_vector = [-math.cos(angle_rad), math.sin(angle_rad)]
+            front_offset_vector = np.multiply(front_vector, front_offset)
+            robot_position = np.add(goal_position, front_offset_vector)
+
+            side_direction = [-front_vector[1], front_vector[0]]
+            side_offset_vector = np.multiply(side_direction, side_offset)
+            robot_position = np.add(robot_position, side_offset_vector)
+
+            print(angle_offset, angle)
+            print(robot_position)
 
             if show_gui:
                 cv2.line(opencv_image, (x_1, y_1), (x_2, y_2), (0, 255, 0), 2)
                 cv2.drawContours(opencv_image, [cnt], -1, (255, 0, 0), 1)
                 cv2.imshow('processed img', opencv_image)
-            print(length, midpoint)
             return robot_position
 
     return None

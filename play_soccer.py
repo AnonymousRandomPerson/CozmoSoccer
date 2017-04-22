@@ -1,7 +1,12 @@
 import cozmo
+import cv2
+import math
+import numpy as np
 import threading
 import time
 
+import find_ball
+import find_goal
 import go_to_goal
 import goto_ball
 import planning
@@ -13,8 +18,8 @@ from state_machine import State, StateMachine
 global grid, gui
 Map_filename = "map_arena.json"
 grid = CozGrid(Map_filename)
-show_gui = False
-if show_gui:
+show_grid = False
+if show_grid:
     gui = GUIWindow(grid)
 else:
     gui = None
@@ -31,6 +36,9 @@ async def run(robot: cozmo.robot.Robot):
     # start streaming
     robot.camera.image_stream_enabled = True
 
+    robot.camera.color_image_enabled = True
+    robot.camera.set_manual_exposure(10, 3.9)
+
     robot.stateMachine = StateMachine(robot)
     await robot.stateMachine.changeState(goto_ball.Search())
 
@@ -45,6 +53,16 @@ async def run(robot: cozmo.robot.Robot):
         current_time = time.time()
         robot.delta_time = current_time - robot.prev_time
         robot.prev_time = current_time
+
+        event = await robot.world.wait_for(cozmo.camera.EvtNewRawCameraImage, timeout=30)
+
+        # convert camera image to opencv format
+        robot.opencv_image = cv2.cvtColor(np.asarray(event.image), cv2.COLOR_RGB2BGR)
+
+        # find the ball
+        ball = find_ball.find_ball(cv2.cvtColor(np.asarray(event.image), cv2.COLOR_RGB2GRAY))
+        # @TODO Testing
+        goal = find_goal.find_goal(robot, robot.opencv_image)
 
         robot.grid_position = robot.grid.worldToGridCoords(robot.position)
         robot.prev_grid_position = robot.grid.worldToGridCoords(robot.prev_position)
@@ -102,9 +120,15 @@ async def initialize_robot(robot):
     robot.RADIUS = (robot.LENGTH ** 2 + robot.WIDTH ** 2) ** 0.5
     # The radius of the ball in mm.
     robot.BALL_RADIUS = 20
+    # The length of the goal in mm.
+    robot.GOAL_LENGTH = 152.4
+    # The distance between the robot's camera and the front of its wheels (in mm).
+    robot.CAMERA_OFFSET = 12
 
     # The horizontal angle of view of the robot's camera (in degrees).
     robot.ANGLE_OF_VIEW = 60
+    # Tangent of half of the field of view, used to figure out the distance away from the ball.
+    robot.TAN_ANGLE = math.tan(math.radians(robot.ANGLE_OF_VIEW) / 2)
 
     # Robot position in millimeters.
     robot.position = [45, 27.5]
@@ -170,14 +194,16 @@ class CozmoThread(threading.Thread):
     def run(self):
         """Executes the thread."""
         cozmo.robot.Robot.drive_off_charger_on_connect = False  # Cozmo can stay on his charger
-        cozmo.run_program(run, use_viewer=False)
+        cozmo.run_program(run, use_viewer = not show_grid, force_viewer_on_top = not show_grid)
 
 if __name__ == '__main__':
 
-    # cozmo thread
-    cozmo_thread = CozmoThread()
-    cozmo_thread.start()
-
     # init
     if gui:
+        # cozmo thread
+        cozmo_thread = CozmoThread()
+        cozmo_thread.start()
+
         gui.start()
+    else:
+        cozmo.run_program(run, use_viewer = True, force_viewer_on_top = False)
