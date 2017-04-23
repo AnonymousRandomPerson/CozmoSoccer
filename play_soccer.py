@@ -63,9 +63,7 @@ async def run(robot: cozmo.robot.Robot):
         # find the ball
         #ball = find_ball.find_ball(cv2.cvtColor(np.asarray(event.image), cv2.COLOR_RGB2GRAY))
         # @TODO Testing
-        before_time = time.time()
         goal = find_goal.find_goal(robot, robot.opencv_image)
-        print("Goal time:", time.time() - before_time)
 
         robot.grid_position = robot.grid.worldToGridCoords(robot.position)
         robot.prev_grid_position = robot.grid.worldToGridCoords(robot.prev_position)

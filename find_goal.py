@@ -32,12 +32,12 @@ def find_goal(robot, opencv_image, debug=True):
         cv2.waitKey(1)
     # Process Image
     robot.camera.set_manual_exposure(10, 3.9)
-    opencv_image = cv2.bilateralFilter(opencv_image, 7, 50, 50)
+    opencv_image = cv2.bilateralFilter(opencv_image, 10, 75, 50)
     mask = cv2.inRange(opencv_image, np.array(
-        [25, 25, 150]), np.array([100, 100, 255]))
+        [25, 25, 125]), np.array([70, 70, 255]))
     #opencv_image = cv2.bitwise_and(opencv_image, opencv_image, mask = mask)
 
-    canny_image = cv2.Canny(mask, 0, 50, apertureSize=3)
+    canny_image = cv2.Canny(mask, 0, 50, apertureSize=5)
     if show_gui:
         cv2.imshow('canny', canny_image)
     """
@@ -53,8 +53,8 @@ def find_goal(robot, opencv_image, debug=True):
     b, contours, hierarchy = cv2.findContours(
         canny_image.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-    # Keep top 10
-    contours = sorted(contours, key=cv2.contourArea, reverse=True)[:10]
+    # Keep top 5
+    contours = sorted(contours, key=cv2.contourArea, reverse=True)[:5]
     for cnt in contours:
         cnt_len = cv2.arcLength(cnt, True)
         # Approximation precision @ 1%
@@ -62,7 +62,8 @@ def find_goal(robot, opencv_image, debug=True):
         cnt_area = cv2.contourArea(cnt)
         # @todo contour area check
         # and cv2.isContourConvex(cnt):
-        if cnt_len > 3 and cnt_len < 13 and cnt_area > 200:
+        cnt_len = len(cnt)
+        if cnt_len > 3 and cnt_len < 13 and cnt_area > 750:
             # Calculate average of y of all points
             sum_y = 0.0
             for point in cnt:
@@ -110,8 +111,8 @@ def find_goal(robot, opencv_image, debug=True):
             if length == 0:
                 continue
 
-            obj_points = np.array([(0, 0, 0), (0, 4, 0), (5.75, 4, 0), (5.75, 0, 0)], dtype='float32')
-            img_points = np.array([bottom_max_point, top_max_point, top_min_point, bottom_min_point], dtype='float32')
+            obj_points = np.array([(0, 0, 0), (0, 5.75, 0), (4, 5.75, 0), (4, 0, 0)], dtype='float32')
+            img_points = np.array([bottom_max_point, bottom_min_point, top_min_point, top_max_point], dtype='float32')
             camK = np.matrix([[295, 0, 160], [0, 295, 120], [0, 0, 1]], dtype='float32')
             pose = cv2.solvePnP(obj_points, img_points, camK, np.array([0, 0, 0, 0], dtype='float32'))
 
