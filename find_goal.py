@@ -26,7 +26,7 @@ def find_goal(robot, opencv_image, mask, debug=True):
 
         Returns [x, y, area] of the goal, and None if no goal is found.
     """
-    show_gui = True
+    show_gui = False
 
     if show_gui:
         cv2.waitKey(1)
@@ -114,7 +114,7 @@ def find_goal(robot, opencv_image, mask, debug=True):
             R_2p_1p = np.matmul(np.matmul(inv(R_2_2p), inv(R_1_2)), R_1_1p)
 
             yaw = -math.atan2(R_2p_1p[2, 0], R_2p_1p[0, 0])
-            x, y = tvec[2][0], tvec[0][0] + goal_width / 2
+            x, y = tvec[2][0] + 0.5, tvec[0][0] + goal_width / 2
 
             goal_position = (robot.grid.width * robot.grid.scale, robot.grid.height * robot.grid.scale / 2)
             goal_offset = (-x, y)

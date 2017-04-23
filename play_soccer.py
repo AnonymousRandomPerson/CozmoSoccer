@@ -18,7 +18,7 @@ from state_machine import State, StateMachine
 global grid, gui
 Map_filename = "map_arena.json"
 grid = CozGrid(Map_filename)
-show_grid = False
+show_grid = True
 if show_grid:
     gui = GUIWindow(grid)
 else:
@@ -95,8 +95,10 @@ async def run(robot: cozmo.robot.Robot):
                 cv2.imshow('dfew', opencv_image)
 
         # find the ball & goal
-        #ball = find_ball.find_ball(grayscale_image)
-        #goal = find_goal.find_goal(robot, opencv_image, goal_mask)
+        # ball = find_ball.find_ball(grayscale_image)
+        guessed_position = find_goal.find_goal(robot, opencv_image, mask)
+        if guessed_position != None:
+            robot.position = guessed_position
 
         robot.grid_position = robot.grid.worldToGridCoords(robot.position)
         robot.prev_grid_position = robot.grid.worldToGridCoords(
@@ -115,7 +117,11 @@ async def run(robot: cozmo.robot.Robot):
         else:
             robot.prev_ball_grid = None
 
+<<<<<<< Updated upstream
         # await robot.stateMachine.update()
+=======
+        await robot.stateMachine.update()
+>>>>>>> Stashed changes
 
         robot.prev_ball = robot.ball
         robot.prev_position = robot.position

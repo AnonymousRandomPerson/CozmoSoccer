@@ -194,7 +194,7 @@ class Search(State):
             await owner.drive_wheels(0, 0, 500, 500)
             return planning.PathPlan()
         turn_speed = self._TURN_SPEED * self._TURN_DIRECTION
-        #await owner.drive_wheels(turn_speed, -turn_speed, 500, 500)
+        await owner.drive_wheels(turn_speed, -turn_speed, 500, 500)
 
 
 class Approach(State):
