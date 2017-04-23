@@ -190,17 +190,6 @@ class Search(State):
             If the object's state should be changed, returns the class of the new state.
             Otherwise, return None.
         """
-        robot = owner
-        event = await robot.world.wait_for(cozmo.camera.EvtNewRawCameraImage, timeout=30)
-
-        # convert camera image to opencv format
-        robot.opencv_image = cv2.cvtColor(np.asarray(event.image), cv2.COLOR_RGB2BGR)
-
-        # find the ball
-        ball = find_ball.find_ball(cv2.cvtColor(np.asarray(event.image), cv2.COLOR_RGB2GRAY))
-        # @TODO Testing
-        goal = find_goal.find_goal(robot, robot.opencv_image)
-
         if owner.ball:
             await owner.drive_wheels(0, 0, 500, 500)
             return planning.PathPlan()
