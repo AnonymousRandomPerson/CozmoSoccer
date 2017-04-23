@@ -113,7 +113,7 @@ def find_goal(robot, opencv_image, debug=True):
                 continue
 
             obj_points = np.array([(0, 0, 0), (0, 4, 0), (5.75, 4, 0), (5.75, 0, 0)], dtype='float32')
-            img_points = np.array([top_min_point, bottom_min_point, bottom_max_point, top_max_point], dtype='float32')
+            img_points = np.array([bottom_min_point, top_min_point, top_max_point, bottom_max_point], dtype='float32')
             camK = np.matrix([[295, 0, 160], [0, 295, 120], [0, 0, 1]], dtype='float32')
             pose = cv2.solvePnP(obj_points, img_points, camK, np.array([0, 0, 0, 0], dtype='float32'))
 
@@ -135,30 +135,7 @@ def find_goal(robot, opencv_image, debug=True):
                 cv2.line(opencv_image, tuple(img_points[0][0]), tuple(img_points[1][0]), (0, 0, 255), thickness = 2)
                 cv2.line(opencv_image, tuple(img_points[0][0]), tuple(img_points[2][0]), (0, 255, 0), thickness = 2)
                 cv2.line(opencv_image, tuple(img_points[0][0]), tuple(img_points[3][0]), (255, 0, 0), thickness = 2)
-            
-            midpoint = ((tx_1 + tx_2) / 2, (ty_1 + ty_2) / 2)
 
-            image_width = len(robot.opencv_image[0])
-            pixel_center = image_width / 2
-            
-            side_offset = (pixel_center - midpoint[0]) / pixel_center * robot.ANGLE_OF_VIEW / 2
-            front_offset = pixel_center / length * robot.GOAL_LENGTH / robot.TAN_ANGLE - robot.LENGTH / 2 - robot.CAMERA_OFFSET
-            goal_position = (robot.grid.width * robot.grid.scale, robot.grid.height * robot.grid.scale / 2)
-
-            angle_offset = 180 - angle ** 2 / 810
-            angle_rad = math.radians(angle_offset)
-
-            front_vector = [-math.cos(angle_rad), math.sin(angle_rad)]
-            front_offset_vector = np.multiply(front_vector, front_offset)
-            robot_position = np.add(goal_position, front_offset_vector)
-
-            side_direction = [-front_vector[1], front_vector[0]]
-            side_offset_vector = np.multiply(side_direction, side_offset)
-            robot_position = np.add(robot_position, side_offset_vector)
-
-            if show_gui:
-                #cv2.line(opencv_image, (tx_1, ty_1), (tx_2, ty_2), (0, 255, 0), 2)
-                #cv2.line(opencv_image, (bx_1, by_1), (bx_2, by_2), (0, 0, 255), 2)
                 cv2.drawContours(opencv_image, [cnt], -1, (255, 0, 0), 1)
                 cv2.imshow('processed img', opencv_image)
             return robot_position
