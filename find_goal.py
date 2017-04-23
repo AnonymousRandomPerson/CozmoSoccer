@@ -6,6 +6,7 @@ import copy
 
 import math
 import numpy as np
+from numpy.linalg import inv
 
 from utils import *
 
@@ -25,7 +26,7 @@ def find_goal(robot, opencv_image, debug=True):
 
         Returns [x, y, area] of the goal, and None if no goal is found.
     """
-    show_gui = False
+    show_gui = True
 
     if show_gui:
         cv2.waitKey(1)
@@ -69,27 +70,73 @@ def find_goal(robot, opencv_image, debug=True):
             for point in cnt:
                 sum_y += point[0][1]
             avg_y = sum_y / cnt_len
-            min_point, max_point = cnt[0], cnt[0]
+            top_min_point, top_max_point = None, None
+            bottom_min_point, bottom_max_point = None, None
             for point in cnt:
                 if point[0][1] > avg_y:
-                    continue
-                min_point = min(min_point, point, key=lambda p: p[0][0])
-                max_point = max(max_point, point, key=lambda p: p[0][0])
+                    if bottom_min_point == None:
+                        bottom_min_point = point
+                        bottom_max_point = point
+                    else:
+                        bottom_min_point = min(bottom_min_point, point, key=lambda p: p[0][0])
+                        bottom_max_point = max(bottom_max_point, point, key=lambda p: p[0][0])
+                else:
+                    if top_min_point == None:
+                        top_min_point = point
+                        top_max_point = point
+                    else:
+                        top_min_point = min(top_min_point, point, key=lambda p: p[0][0])
+                        top_max_point = max(top_max_point, point, key=lambda p: p[0][0])
 
-            min_point = min_point[0]
-            max_point = max_point[0]
+            top_min_point = top_min_point[0]
+            top_max_point = top_max_point[0]
+            bottom_min_point = bottom_min_point[0]
+            bottom_max_point = bottom_max_point[0]
 
-            angle = find_angle(min_point, max_point)
+            blockThreshold = 20
+            if abs(top_min_point[0] - bottom_min_point[0]) > blockThreshold:
+                pass
+            elif abs(top_max_point[0] - bottom_max_point[0]) > blockThreshold:
+                pass
+
+            angle = find_angle(top_min_point, top_max_point)
             if angle > 20:
                 continue
 
-            x_1, y_1 = min_point[0], min_point[1]
-            x_2, y_2 = max_point[0], max_point[1]
+            tx_1, ty_1 = top_min_point[0], top_min_point[1]
+            tx_2, ty_2 = top_max_point[0], top_max_point[1]
+            bx_1, by_1 = bottom_min_point[0], bottom_min_point[1]
+            bx_2, by_2 = bottom_max_point[0], bottom_max_point[1]
             
-            length = grid_distance(x_1, y_1, x_2, y_2)
+            length = grid_distance(tx_1, ty_1, tx_2, ty_2)
             if length == 0:
                 continue
-            midpoint = ((x_1 + x_2) / 2, (y_1 + y_2) / 2)
+
+            obj_points = np.array([(0, 0, 0), (0, 4, 0), (5.75, 4, 0), (5.75, 0, 0)], dtype='float32')
+            img_points = np.array([top_min_point, bottom_min_point, bottom_max_point, top_max_point], dtype='float32')
+            camK = np.matrix([[295, 0, 160], [0, 295, 120], [0, 0, 1]], dtype='float32')
+            pose = cv2.solvePnP(obj_points, img_points, camK, np.array([0, 0, 0, 0], dtype='float32'))
+
+            rvec = pose[1]
+            tvec = pose[2]
+            R_1_2, J = cv2.Rodrigues(rvec)
+            R_1_1p = np.matrix([[0, 0, 1], [0, -1, 0], [1, 0, 0]])
+            R_2_2p = np.matrix([[0, -1, 0], [0, 0, -1], [1, 0, 0]])
+            R_2p_1p = np.matmul(np.matmul(inv(R_2_2p), inv(R_1_2)), R_1_1p)
+
+            yaw = -math.atan2(R_2p_1p[2, 0], R_2p_1p[0, 0])
+            x, y = tvec[2][0] + 0.5, tvec[0][0]
+
+            if show_gui:
+                # get plot obj points
+                obj_points = np.array([(0, 0, 0), (3, 0, 0), (0, 3, 0), (0, 0, 3)], dtype='float32')
+                # convert to img points
+                img_points = cv2.projectPoints(obj_points, rvec, tvec, camK, np.array([0, 0, 0, 0], dtype='float32'))[0]
+                cv2.line(opencv_image, tuple(img_points[0][0]), tuple(img_points[1][0]), (0, 0, 255), thickness = 2)
+                cv2.line(opencv_image, tuple(img_points[0][0]), tuple(img_points[2][0]), (0, 255, 0), thickness = 2)
+                cv2.line(opencv_image, tuple(img_points[0][0]), tuple(img_points[3][0]), (255, 0, 0), thickness = 2)
+            
+            midpoint = ((tx_1 + tx_2) / 2, (ty_1 + ty_2) / 2)
 
             image_width = len(robot.opencv_image[0])
             pixel_center = image_width / 2
@@ -109,15 +156,14 @@ def find_goal(robot, opencv_image, debug=True):
             side_offset_vector = np.multiply(side_direction, side_offset)
             robot_position = np.add(robot_position, side_offset_vector)
 
-            print(angle_offset, angle)
-            print(robot_position)
-
             if show_gui:
-                cv2.line(opencv_image, (x_1, y_1), (x_2, y_2), (0, 255, 0), 2)
+                #cv2.line(opencv_image, (tx_1, ty_1), (tx_2, ty_2), (0, 255, 0), 2)
+                #cv2.line(opencv_image, (bx_1, by_1), (bx_2, by_2), (0, 0, 255), 2)
                 cv2.drawContours(opencv_image, [cnt], -1, (255, 0, 0), 1)
                 cv2.imshow('processed img', opencv_image)
             return robot_position
 
+    cv2.imshow('processed img', opencv_image)
     return None
 
 

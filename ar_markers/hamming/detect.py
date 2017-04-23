@@ -24,8 +24,10 @@ def get_marker_pose(marker, marker_size, camK):
         (marker_size,0,0)], dtype='float32')
     img_points = np.array([marker.contours[0][0], marker.contours[1][0], \
         marker.contours[2][0], marker.contours[3][0]], dtype='float32')
-    return cv2.solvePnP(obj_points, img_points, camK, np.array([0,0,0,0], \
+    pose = cv2.solvePnP(obj_points, img_points, camK, np.array([0,0,0,0], \
         dtype='float32'))
+    print(img_points)
+    return pose
 
 def rotate_contour(contour, persp_transf, rot_num):
 

@@ -23,6 +23,7 @@ if show_grid:
     gui = GUIWindow(grid)
 else:
     gui = None
+show_camera = False
 
 async def run(robot: cozmo.robot.Robot):
     """
@@ -206,4 +207,4 @@ if __name__ == '__main__':
 
         gui.start()
     else:
-        cozmo.run_program(run, use_viewer = True, force_viewer_on_top = False)
+        cozmo.run_program(run, use_viewer = show_camera, force_viewer_on_top = False)
