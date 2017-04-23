@@ -55,15 +55,26 @@ async def run(robot: cozmo.robot.Robot):
         robot.delta_time = current_time - robot.prev_time
         robot.prev_time = current_time
 
+        # Continuously remind Cozmo of camera settings (cause sometimes it resets)
+        robot.camera.set_manual_exposure(10, 3.9)
+
         event = await robot.world.wait_for(cozmo.camera.EvtNewRawCameraImage, timeout=30)
 
-        # convert camera image to opencv format
-        robot.opencv_image = cv2.cvtColor(np.asarray(event.image), cv2.COLOR_RGB2BGR)
+        # Convert camera image to opencv format
+        opencv_image = cv2.cvtColor(np.asarray(event.image), cv2.COLOR_RGB2BGR)
+        opencv_image = cv2.bilateralFilter(opencv_image, 10, 75, 50)
+        
+        # Goal mask
+        mask = cv2.inRange(opencv_image, np.array(
+        [25, 25, 125]), np.array([70, 70, 255]))
 
-        # find the ball
-        #ball = find_ball.find_ball(cv2.cvtColor(np.asarray(event.image), cv2.COLOR_RGB2GRAY))
-        # @TODO Testing
-        goal = find_goal.find_goal(robot, robot.opencv_image)
+        # Greyscaled image
+        grayscale_image = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
+        removed_goal_image = grayscale_image[mask > 0] = 255
+
+        # find the ball & goal
+        #ball = find_ball.find_ball(grayscale_image)
+        goal = find_goal.find_goal(robot, opencv_image, mask)
 
         robot.grid_position = robot.grid.worldToGridCoords(robot.position)
         robot.prev_grid_position = robot.grid.worldToGridCoords(robot.prev_position)

@@ -26,10 +26,6 @@ def find_ball(opencv_image, debug=False):
     ball = None
 
     # INSERT SOLUTION
-
-    # Process Image
-    opencv_image = cv2.bilateralFilter(opencv_image, 7, 50, 50)
-
     #opencv_image = cv2.blur(opencv_image,(7, 7))
 
     # opencv_image = cv2.normalize(opencv_image, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)

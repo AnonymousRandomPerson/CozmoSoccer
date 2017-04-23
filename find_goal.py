@@ -16,7 +16,7 @@ except ImportError:
     sys.exit('install Pillow to run this code')
 
 
-def find_goal(robot, opencv_image, debug=True):
+def find_goal(robot, opencv_image, mask, debug=True):
     """Find the goal in an image.
 
         Arguments:
@@ -31,24 +31,11 @@ def find_goal(robot, opencv_image, debug=True):
     if show_gui:
         cv2.waitKey(1)
     # Process Image
-    robot.camera.set_manual_exposure(10, 3.9)
-    opencv_image = cv2.bilateralFilter(opencv_image, 10, 75, 50)
-    mask = cv2.inRange(opencv_image, np.array(
-        [25, 25, 125]), np.array([70, 70, 255]))
-    #opencv_image = cv2.bitwise_and(opencv_image, opencv_image, mask = mask)
+    # opencv_image = cv2.bitwise_and(opencv_image, opencv_image, mask = mask)
 
     canny_image = cv2.Canny(mask, 0, 50, apertureSize=5)
     if show_gui:
         cv2.imshow('canny', canny_image)
-    """
-    lines = cv2.HoughLinesP(canny_image, 1, np.pi/180, 100, minLineLength=15, maxLineGap=25)
-    print(lines)
-    if lines is None:
-        return None
-    for x_1, y_1, x_2, y_2 in lines[0]:
-        cv2.line(opencv_image, (x_1, y_1), (x_2, y_2), (0, 255, 0), 2)
-    cv2.imshow('lines', opencv_image)
-    """
 
     b, contours, hierarchy = cv2.findContours(
         canny_image.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
