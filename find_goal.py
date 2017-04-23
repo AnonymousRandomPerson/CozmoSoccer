@@ -93,9 +93,10 @@ def find_goal(robot, opencv_image, debug=True):
             bottom_max_point = bottom_max_point[0]
 
             blockThreshold = 20
-            if abs(top_min_point[0] - bottom_min_point[0]) > blockThreshold:
+            heightMismatch = abs(bottom_min_point[1] - bottom_max_point[1]) > blockThreshold
+            if (heightMismatch and bottom_min_point[1] > bottom_max_point[1]) or abs(top_min_point[0] - bottom_min_point[0]) > blockThreshold or :
                 bottom_min_point = (bottom_max_point[0] - (top_max_point[0] - top_min_point[0]), bottom_max_point[1] - (top_max_point[1] - top_min_point[1]))
-            elif abs(top_max_point[0] - bottom_max_point[0]) > blockThreshold:
+            elif (heightMismatch and bottom_min_point[1] < bottom_max_point[1]) or abs(top_max_point[0] - bottom_max_point[0]) > blockThreshold or :
                 bottom_max_point = (bottom_min_point[0] + (top_max_point[0] - top_min_point[0]), bottom_min_point[1] + (top_max_point[1] - top_min_point[1]))
 
             angle = find_angle(top_min_point, top_max_point)
