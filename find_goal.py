@@ -44,7 +44,7 @@ def find_goal(robot, opencv_image, mask, debug=True):
     contours = sorted(contours, key=cv2.contourArea, reverse=True)[:5]
     for cnt in contours:
         cnt_len = cv2.arcLength(cnt, True)
-        # Approximation precision @ 1%
+        # Approximation precision @ 2%
         cnt = cv2.approxPolyDP(cnt, 0.02 * cnt_len, True)
         cnt_area = cv2.contourArea(cnt)
         # @todo contour area check

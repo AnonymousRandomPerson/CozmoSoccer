@@ -3,6 +3,7 @@
 import cv2
 import sys
 import copy
+import time
 
 import numpy as np
 
@@ -34,7 +35,6 @@ def find_ball(opencv_image, debug=False):
     # cv2.imshow('img', opencv_image)
     # cv2.waitKey(0)
     # cv2.destroyAllWindows()
-
     ball_keypoints = cv2.HoughCircles(
         opencv_image, cv2.HOUGH_GRADIENT, 1.3, 7, param1=70, param2=20)
 
@@ -75,13 +75,12 @@ def find_ball(opencv_image, debug=False):
                 tot_pixels += 1
                 if opencv_image[y, x] < INTENSITY_THRESHOLD:
                     count += 1
-
         if count > INTENSITY_MIN_RATE * tot_pixels:
             if debug:
                 circles = []
                 circles.append([circ_x, circ_y, circ_rad])
                 display_circles(opencv_image, circles)
-
+            
             return [circ_x, circ_y, circ_rad]
 
     return None

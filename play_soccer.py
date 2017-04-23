@@ -25,6 +25,7 @@ else:
     gui = None
 show_camera = False
 
+
 async def run(robot: cozmo.robot.Robot):
     """
     Causes the robot to play one-robot soccer.
@@ -55,7 +56,8 @@ async def run(robot: cozmo.robot.Robot):
         robot.delta_time = current_time - robot.prev_time
         robot.prev_time = current_time
 
-        # Continuously remind Cozmo of camera settings (cause sometimes it resets)
+        # Continuously remind Cozmo of camera settings (cause sometimes it
+        # resets)
         robot.camera.set_manual_exposure(10, 3.9)
 
         event = await robot.world.wait_for(cozmo.camera.EvtNewRawCameraImage, timeout=30)
@@ -63,34 +65,57 @@ async def run(robot: cozmo.robot.Robot):
         # Convert camera image to opencv format
         opencv_image = cv2.cvtColor(np.asarray(event.image), cv2.COLOR_RGB2BGR)
         opencv_image = cv2.bilateralFilter(opencv_image, 10, 75, 50)
-        
         # Goal mask
-        mask = cv2.inRange(opencv_image, np.array(
-        [25, 25, 125]), np.array([70, 70, 255]))
+        goal_mask = cv2.inRange(opencv_image, np.array(
+            [25, 25, 125]), np.array([70, 70, 255]))
 
         # Greyscaled image
         grayscale_image = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
-        removed_goal_image = grayscale_image[mask > 0] = 255
+        removed_goal_image = grayscale_image[goal_mask > 0] = 255
+
+        ball_mask =  cv2.inRange(opencv_image, np.array(
+            [0, 0, 0]), np.array([45, 45, 80]))
+        ball_mask = cv2.dilate(ball_mask, None, iterations=2)
+
+        #canny_ball = cv2.Canny(ball_mask, 0, 50, apertureSize=5)
+
+        cnts = cv2.findContours(ball_mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
+        center = None
+        if len(cnts) > 0:
+            c = max(cnts, key=cv2.contourArea)
+            ((x, y), radius) = cv2.minEnclosingCircle(c)
+            M = cv2.moments(c)
+            center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+            
+            if radius > 10 and radius < 85:
+                print(radius)
+                cv2.circle(opencv_image, (int(x), int(y)), int(radius), (0, 255, 255), 2)
+                cv2.circle(opencv_image, center, 5, (0, 0, 255), -1)
+                cv2.waitKey(1)
+                cv2.imshow('dfew', opencv_image)
 
         # find the ball & goal
         #ball = find_ball.find_ball(grayscale_image)
-        goal = find_goal.find_goal(robot, opencv_image, mask)
+        #goal = find_goal.find_goal(robot, opencv_image, goal_mask)
 
         robot.grid_position = robot.grid.worldToGridCoords(robot.position)
-        robot.prev_grid_position = robot.grid.worldToGridCoords(robot.prev_position)
+        robot.prev_grid_position = robot.grid.worldToGridCoords(
+            robot.prev_position)
         if robot.gui:
-            robot.gui.show_mean(robot.grid_position[0], robot.grid_position[1], robot.rotation)
+            robot.gui.show_mean(
+                robot.grid_position[0], robot.grid_position[1], robot.rotation)
 
         if robot.ball:
             robot.ball_grid = robot.grid.worldToGridCoords(robot.ball)
         else:
             robot.ball_grid = None
         if robot.prev_ball:
-            robot.prev_ball_grid = robot.grid.worldToGridCoords(robot.prev_ball)
+            robot.prev_ball_grid = robot.grid.worldToGridCoords(
+                robot.prev_ball)
         else:
             robot.prev_ball_grid = None
 
-        #await robot.stateMachine.update()
+        # await robot.stateMachine.update()
 
         robot.prev_ball = robot.ball
         robot.prev_position = robot.position
@@ -98,6 +123,7 @@ async def run(robot: cozmo.robot.Robot):
 
         if robot.gui:
             robot.gui.updated.set()
+
 
 async def initialize_robot(robot):
     """
@@ -121,7 +147,8 @@ async def initialize_robot(robot):
     robot.TURN_YAW = 1 / 55 * robot.TURN_SPEED * 2
     # The acceleration of the robot.
     robot.ROBOT_ACCELERATION = 1000
-    # The amount of difference between the target and actual angles that the robot will tolerate when turning.
+    # The amount of difference between the target and actual angles that the
+    # robot will tolerate when turning.
     robot.TURN_TOLERANCE = 20
 
     # The length of the robot in mm.
@@ -134,12 +161,14 @@ async def initialize_robot(robot):
     robot.BALL_RADIUS = 20
     # The length of the goal in mm.
     robot.GOAL_LENGTH = 152.4
-    # The distance between the robot's camera and the front of its wheels (in mm).
+    # The distance between the robot's camera and the front of its wheels (in
+    # mm).
     robot.CAMERA_OFFSET = 12
 
     # The horizontal angle of view of the robot's camera (in degrees).
     robot.ANGLE_OF_VIEW = 60
-    # Tangent of half of the field of view, used to figure out the distance away from the ball.
+    # Tangent of half of the field of view, used to figure out the distance
+    # away from the ball.
     robot.TAN_ANGLE = math.tan(math.radians(robot.ANGLE_OF_VIEW) / 2)
 
     # Robot position in millimeters.
@@ -174,9 +203,11 @@ async def initialize_robot(robot):
     robot.was_driving = False
     # Whether the robot was turning with drive_wheels on the previous frame.
     robot.was_turning = False
-    # Cooldown (s) for keeping track of movement when the robot is starting to drive.
+    # Cooldown (s) for keeping track of movement when the robot is starting to
+    # drive.
     robot.DRIVE_COOLDOWN = 0
-    # Timer (s) for keeping track of movement when the robot is starting to drive.
+    # Timer (s) for keeping track of movement when the robot is starting to
+    # drive.
     robot.drive_timer = robot.DRIVE_COOLDOWN
     # Threshold for ignoring small turns.
     robot.TURN_THRESHOLD = 0.5
@@ -196,9 +227,10 @@ async def initialize_robot(robot):
     # The previous grid position of the robot.
     robot.prev_grid_position = (0, 0)
 
+
 class CozmoThread(threading.Thread):
     """Thread for robot action execution."""
-    
+
     def __init__(self):
         """Initializes the thread."""
         threading.Thread.__init__(self, daemon=False)
@@ -206,7 +238,9 @@ class CozmoThread(threading.Thread):
     def run(self):
         """Executes the thread."""
         cozmo.robot.Robot.drive_off_charger_on_connect = False  # Cozmo can stay on his charger
-        cozmo.run_program(run, use_viewer = not show_grid, force_viewer_on_top = not show_grid)
+        cozmo.run_program(run, use_viewer=not show_grid,
+                          force_viewer_on_top=not show_grid)
+
 
 if __name__ == '__main__':
 
@@ -218,4 +252,5 @@ if __name__ == '__main__':
 
         gui.start()
     else:
-        cozmo.run_program(run, use_viewer = show_camera, force_viewer_on_top = False)
+        cozmo.run_program(run, use_viewer=show_camera,
+                          force_viewer_on_top=False)
