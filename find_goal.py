@@ -58,13 +58,11 @@ def find_goal(robot, opencv_image, debug=True):
     for cnt in contours:
         cnt_len = cv2.arcLength(cnt, True)
         # Approximation precision @ 1%
-        cnt = cv2.approxPolyDP(cnt, 0.01 * cnt_len, True)
+        cnt = cv2.approxPolyDP(cnt, 0.02 * cnt_len, True)
         cnt_area = cv2.contourArea(cnt)
-        cnt_len = len(cnt)
         # @todo contour area check
         # and cv2.isContourConvex(cnt):
         if cnt_len > 3 and cnt_len < 13 and cnt_area > 200:
-
             # Calculate average of y of all points
             sum_y = 0.0
             for point in cnt:
@@ -138,7 +136,7 @@ def find_goal(robot, opencv_image, debug=True):
 
                 cv2.drawContours(opencv_image, [cnt], -1, (255, 0, 0), 1)
                 cv2.imshow('processed img', opencv_image)
-            return robot_position
+            return None
 
     cv2.imshow('processed img', opencv_image)
     return None
