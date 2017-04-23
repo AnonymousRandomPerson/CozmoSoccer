@@ -111,7 +111,7 @@ def find_goal(robot, opencv_image, debug=True):
                 continue
 
             obj_points = np.array([(0, 0, 0), (0, 4, 0), (5.75, 4, 0), (5.75, 0, 0)], dtype='float32')
-            img_points = np.array([bottom_min_point, top_min_point, top_max_point, bottom_max_point], dtype='float32')
+            img_points = np.array([bottom_max_point, top_max_point, top_min_point, bottom_min_point], dtype='float32')
             camK = np.matrix([[295, 0, 160], [0, 295, 120], [0, 0, 1]], dtype='float32')
             pose = cv2.solvePnP(obj_points, img_points, camK, np.array([0, 0, 0, 0], dtype='float32'))
 
