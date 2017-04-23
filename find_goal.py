@@ -80,10 +80,11 @@ def find_goal(robot, opencv_image, mask, debug=True):
             bottom_max_point = bottom_max_point[0]
 
             blockThreshold = 20
-            if abs(top_min_point[0] - bottom_min_point[0]) > blockThreshold:
-                pass
-            elif abs(top_max_point[0] - bottom_max_point[0]) > blockThreshold:
-                pass
+            heightMismatch = abs(bottom_min_point[1] - bottom_max_point[1]) > blockThreshold
+            if (heightMismatch and bottom_min_point[1] > bottom_max_point[1]) or abs(top_min_point[0] - bottom_min_point[0]) > blockThreshold or :
+                bottom_min_point = (bottom_max_point[0] - (top_max_point[0] - top_min_point[0]), bottom_max_point[1] - (top_max_point[1] - top_min_point[1]))
+            elif (heightMismatch and bottom_min_point[1] < bottom_max_point[1]) or abs(top_max_point[0] - bottom_max_point[0]) > blockThreshold or :
+                bottom_max_point = (bottom_min_point[0] + (top_max_point[0] - top_min_point[0]), bottom_min_point[1] + (top_max_point[1] - top_min_point[1]))
 
             angle = find_angle(top_min_point, top_max_point)
             if angle > 20:
@@ -113,18 +114,31 @@ def find_goal(robot, opencv_image, mask, debug=True):
             yaw = -math.atan2(R_2p_1p[2, 0], R_2p_1p[0, 0])
             x, y = tvec[2][0] + 0.5, tvec[0][0]
 
+            goal_position = (robot.grid.width * robot.grid.scale, robot.grid.height * robot.grid.scale / 2)
+            robot_position = np.add(goal_position, (-x, y))
+            print("Robot position:", robot_position)
+
             if show_gui:
                 # get plot obj points
                 obj_points = np.array([(0, 0, 0), (3, 0, 0), (0, 3, 0), (0, 0, 3)], dtype='float32')
                 # convert to img points
                 img_points = cv2.projectPoints(obj_points, rvec, tvec, camK, np.array([0, 0, 0, 0], dtype='float32'))[0]
-                cv2.line(opencv_image, tuple(img_points[0][0]), tuple(img_points[1][0]), (0, 0, 255), thickness = 2)
-                cv2.line(opencv_image, tuple(img_points[0][0]), tuple(img_points[2][0]), (0, 255, 0), thickness = 2)
-                cv2.line(opencv_image, tuple(img_points[0][0]), tuple(img_points[3][0]), (255, 0, 0), thickness = 2)
+                axisThickness = 2
+                origin = tuple(img_points[0][0])
+                cv2.line(opencv_image, origin, tuple(img_points[1][0]), (0, 0, 255), thickness = axisThickness)
+                cv2.line(opencv_image, origin, tuple(img_points[2][0]), (0, 255, 0), thickness = axisThickness)
+                cv2.line(opencv_image, origin, tuple(img_points[3][0]), (255, 0, 0), thickness = axisThickness)
+
+                rectThickness = 2
+                rectColor = (0, 255, 255)
+                cv2.line(opencv_image, bottom_min_point, bottom_max_point, rectColor, thickness = rectThickness)
+                cv2.line(opencv_image, bottom_max_point, top_max_point, rectColor, thickness = rectThickness)
+                cv2.line(opencv_image, top_max_point, top_min_point, rectColor, thickness = rectThickness)
+                cv2.line(opencv_image, top_min_point, bottom_min_point, rectColor, thickness = rectThickness)
 
                 cv2.drawContours(opencv_image, [cnt], -1, (255, 0, 0), 1)
                 cv2.imshow('processed img', opencv_image)
-            return None
+            return robot_position
 
     cv2.imshow('processed img', opencv_image)
     return None
