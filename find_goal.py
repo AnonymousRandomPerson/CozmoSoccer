@@ -59,14 +59,14 @@ def find_goal(robot, opencv_image, mask, debug=True):
             top_min_point, top_max_point = None, None
             bottom_min_point, bottom_max_point = None, None
             for point in cnt:
-                if point[0][1] > avg_y:
+                if point[0][1] > avg_y * 1.1:
                     if bottom_min_point == None:
                         bottom_min_point = point
                         bottom_max_point = point
                     else:
                         bottom_min_point = min(bottom_min_point, point, key=lambda p: p[0][0])
                         bottom_max_point = max(bottom_max_point, point, key=lambda p: p[0][0])
-                else:
+                elif point[0][1] < avg_y  * 0.9:
                     if top_min_point == None:
                         top_min_point = point
                         top_max_point = point
@@ -79,11 +79,11 @@ def find_goal(robot, opencv_image, mask, debug=True):
             bottom_min_point = bottom_min_point[0]
             bottom_max_point = bottom_max_point[0]
 
-            blockThreshold = 20
+            blockThreshold = 10
             heightMismatch = abs(bottom_min_point[1] - bottom_max_point[1]) > blockThreshold
-            if (heightMismatch and bottom_min_point[1] > bottom_max_point[1]) or abs(top_min_point[0] - bottom_min_point[0]) > blockThreshold:
+            if (heightMismatch and bottom_min_point[1] < bottom_max_point[1]) or abs(top_min_point[0] - bottom_min_point[0]) > blockThreshold:
                 bottom_min_point = (bottom_max_point[0] - (top_max_point[0] - top_min_point[0]), bottom_max_point[1] - (top_max_point[1] - top_min_point[1]))
-            elif (heightMismatch and bottom_min_point[1] < bottom_max_point[1]) or abs(top_max_point[0] - bottom_max_point[0]) > blockThreshold:
+            elif (heightMismatch and bottom_min_point[1] > bottom_max_point[1]) or abs(top_max_point[0] - bottom_max_point[0]) > blockThreshold:
                 bottom_max_point = (bottom_min_point[0] + (top_max_point[0] - top_min_point[0]), bottom_min_point[1] + (top_max_point[1] - top_min_point[1]))
 
             angle = find_angle(top_min_point, top_max_point)
@@ -115,8 +115,10 @@ def find_goal(robot, opencv_image, mask, debug=True):
             x, y = tvec[2][0] + 0.5, tvec[0][0]
 
             goal_position = (robot.grid.width * robot.grid.scale, robot.grid.height * robot.grid.scale / 2)
-            robot_position = np.add(goal_position, (-x, y))
-            print("Robot position:", robot_position)
+            goal_offset = (-x, y)
+            goal_offset = np.multiply(goal_offset, 25.4)
+            robot_position = np.add(goal_position, goal_offset)
+            print("Robot position:", robot_position, y)
 
             if show_gui:
                 # get plot obj points
