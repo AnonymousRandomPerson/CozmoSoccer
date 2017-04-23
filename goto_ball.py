@@ -23,19 +23,6 @@ except ImportError:
 
 from state_machine import State, StateMachine
 
-
-# Define a decorator as a subclass of Annotator; displays battery voltage
-class BatteryAnnotator(cozmo.annotate.Annotator):
-    def apply(self, image, scale):
-        d = ImageDraw.Draw(image)
-        bounds = (0, 0, image.width, image.height)
-        batt = self.world.robot.battery_voltage
-        if not self.world.robot.stateMachine: return
-
-        text = cozmo.annotate.ImageText(self.world.robot.stateMachine.getState(), color='green')
-        text.render(d, bounds)
-
-
 # Define a decorator as a subclass of Annotator; displays the ball
 class BallAnnotator(cozmo.annotate.Annotator):
     ball = None
@@ -55,65 +42,6 @@ class BallAnnotator(cozmo.annotate.Annotator):
                                   scaledBall[1] - scaledBall[2],
                                   scaledBall[2] * 2, scaledBall[2] * 2)
         cozmo.annotate.add_img_box_to_image(image, box, "green", text=None)
-
-
-async def run(robot: cozmo.robot.Robot):
-    '''The run method runs once the Cozmo SDK is connected.'''
-    await play_soccer.initialize_robot(robot)
-
-    # add annotators for battery level and ball bounding box
-    stateMachine = StateMachine(robot)
-    await stateMachine.changeState(Search())
-    robot.stateMachine = stateMachine
-    robot.world.image_annotator.add_annotator('battery', BatteryAnnotator)
-    robot.world.image_annotator.add_annotator('ball', BallAnnotator)
-    robot.debug = False
-
-    # Camera settings
-    robot.camera.color_image_enabled = True
-    robot.camera.set_manual_exposure(10, 3.9)
-
-    await robot.set_head_angle(degrees(-5), in_parallel = True).wait_for_completed()
-    await robot.set_lift_height(1.0, in_parallel = True).wait_for_completed()
-
-    # The number of images that the robot will take into account to get the ball's average data.
-    NUM_TRIALS = 2
-    # Whether to disable the robot from moving.
-    MOTION_DISABLED = False
-
-    robot.last_angle = 0
-
-    try:
-        while True:
-            # get camera image
-            event = await robot.world.wait_for(cozmo.camera.EvtNewRawCameraImage, timeout=30)
-
-            # convert camera image to opencv format
-            robot.opencv_image = cv2.cvtColor(np.asarray(event.image), cv2.COLOR_RGB2BGR)
-
-            # find the ball
-            ball = find_ball.find_ball(cv2.cvtColor(np.asarray(event.image), cv2.COLOR_RGB2GRAY))
-            # @TODO Testing
-            goal = find_goal.find_goal(robot, robot.opencv_image)
-
-            # set annotator ball
-            if robot.debug:
-                print("Ball: " + str(ball))
-            BallAnnotator.ball = ball
-            if ball and ball[1] > len(robot.opencv_image[0]) / 10:
-                robot.ball = ball
-            else:
-                robot.ball = None
-
-            if not MOTION_DISABLED:
-                await stateMachine.update()
-
-    except KeyboardInterrupt:
-        print("")
-        print("Exit requested by user")
-    except cozmo.RobotBusy as e:
-        print(e)
-
 
 async def doActionWithTimeout(action, timeout):
     """Executes an action, canceling it after a certain amount of time if it doesn't finish.

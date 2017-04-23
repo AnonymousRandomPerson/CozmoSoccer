@@ -117,11 +117,7 @@ async def run(robot: cozmo.robot.Robot):
         else:
             robot.prev_ball_grid = None
 
-<<<<<<< Updated upstream
-        # await robot.stateMachine.update()
-=======
         await robot.stateMachine.update()
->>>>>>> Stashed changes
 
         robot.prev_ball = robot.ball
         robot.prev_position = robot.position
