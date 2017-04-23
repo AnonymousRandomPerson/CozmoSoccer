@@ -81,9 +81,9 @@ def find_goal(robot, opencv_image, mask, debug=True):
 
             blockThreshold = 20
             heightMismatch = abs(bottom_min_point[1] - bottom_max_point[1]) > blockThreshold
-            if (heightMismatch and bottom_min_point[1] > bottom_max_point[1]) or abs(top_min_point[0] - bottom_min_point[0]) > blockThreshold or :
+            if (heightMismatch and bottom_min_point[1] > bottom_max_point[1]) or abs(top_min_point[0] - bottom_min_point[0]) > blockThreshold:
                 bottom_min_point = (bottom_max_point[0] - (top_max_point[0] - top_min_point[0]), bottom_max_point[1] - (top_max_point[1] - top_min_point[1]))
-            elif (heightMismatch and bottom_min_point[1] < bottom_max_point[1]) or abs(top_max_point[0] - bottom_max_point[0]) > blockThreshold or :
+            elif (heightMismatch and bottom_min_point[1] < bottom_max_point[1]) or abs(top_max_point[0] - bottom_max_point[0]) > blockThreshold:
                 bottom_max_point = (bottom_min_point[0] + (top_max_point[0] - top_min_point[0]), bottom_min_point[1] + (top_max_point[1] - top_min_point[1]))
 
             angle = find_angle(top_min_point, top_max_point)
@@ -131,10 +131,10 @@ def find_goal(robot, opencv_image, mask, debug=True):
 
                 rectThickness = 2
                 rectColor = (0, 255, 255)
-                cv2.line(opencv_image, bottom_min_point, bottom_max_point, rectColor, thickness = rectThickness)
-                cv2.line(opencv_image, bottom_max_point, top_max_point, rectColor, thickness = rectThickness)
-                cv2.line(opencv_image, top_max_point, top_min_point, rectColor, thickness = rectThickness)
-                cv2.line(opencv_image, top_min_point, bottom_min_point, rectColor, thickness = rectThickness)
+                cv2.line(opencv_image, tuple(bottom_min_point), tuple(bottom_max_point), rectColor, thickness = rectThickness)
+                cv2.line(opencv_image, tuple(bottom_max_point), tuple(top_max_point), rectColor, thickness = rectThickness)
+                cv2.line(opencv_image, tuple(top_max_point), tuple(top_min_point), rectColor, thickness = rectThickness)
+                cv2.line(opencv_image, tuple(top_min_point), tuple(bottom_min_point), rectColor, thickness = rectThickness)
 
                 cv2.drawContours(opencv_image, [cnt], -1, (255, 0, 0), 1)
                 cv2.imshow('processed img', opencv_image)
