@@ -99,10 +99,12 @@ def find_goal(robot, opencv_image, mask, debug=True):
             if length == 0:
                 continue
 
-            obj_points = np.array([(0, 0, 0), (0, 5.75, 0), (4, 5.75, 0), (4, 0, 0)], dtype='float32')
-            img_points = np.array([bottom_max_point, bottom_min_point, top_min_point, top_max_point], dtype='float32')
-            camK = np.matrix([[295, 0, 160], [0, 295, 120], [0, 0, 1]], dtype='float32')
-            pose = cv2.solvePnP(obj_points, img_points, camK, np.array([0, 0, 0, 0], dtype='float32'))
+            goal_width = 5.75
+            goal_height = 4
+            obj_points = np.array([(0, 0, 0), (0, goal_width, 0), (goal_height, goal_width, 0), (goal_height, 0, 0)], dtype = 'float32')
+            img_points = np.array([bottom_max_point, bottom_min_point, top_min_point, top_max_point], dtype = 'float32')
+            camK = np.matrix([[295, 0, 160], [0, 295, 120], [0, 0, 1]], dtype = 'float32')
+            pose = cv2.solvePnP(obj_points, img_points, camK, np.array([0, 0, 0, 0], dtype = 'float32'))
 
             rvec = pose[1]
             tvec = pose[2]
@@ -112,11 +114,11 @@ def find_goal(robot, opencv_image, mask, debug=True):
             R_2p_1p = np.matmul(np.matmul(inv(R_2_2p), inv(R_1_2)), R_1_1p)
 
             yaw = -math.atan2(R_2p_1p[2, 0], R_2p_1p[0, 0])
-            x, y = tvec[2][0] + 0.5, tvec[0][0]
+            x, y = tvec[2][0], tvec[0][0] + goal_width / 2
 
             goal_position = (robot.grid.width * robot.grid.scale, robot.grid.height * robot.grid.scale / 2)
             goal_offset = (-x, y)
-            goal_offset = np.multiply(goal_offset, 25.4)
+            goal_offset = np.multiply(goal_offset, robot.grid.scale)
             robot_position = np.add(goal_position, goal_offset)
             print("Robot position:", robot_position, y)
 
