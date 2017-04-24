@@ -65,37 +65,17 @@ async def run(robot: cozmo.robot.Robot):
         # Convert camera image to opencv format
         opencv_image = cv2.cvtColor(np.asarray(event.image), cv2.COLOR_RGB2BGR)
         opencv_image = cv2.bilateralFilter(opencv_image, 10, 75, 50)
-        # Goal mask
+        
+        # Masks
         goal_mask = cv2.inRange(opencv_image, np.array(
             [25, 25, 125]), np.array([70, 70, 255]))
-
-        # Greyscaled image
-        grayscale_image = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
-        removed_goal_image = grayscale_image[goal_mask > 0] = 255
-
         ball_mask =  cv2.inRange(opencv_image, np.array(
             [0, 0, 0]), np.array([45, 45, 80]))
         ball_mask = cv2.dilate(ball_mask, None, iterations=2)
 
-        #canny_ball = cv2.Canny(ball_mask, 0, 50, apertureSize=5)
-
-        cnts = cv2.findContours(ball_mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
-        center = None
-        if len(cnts) > 0:
-            c = max(cnts, key=cv2.contourArea)
-            ((x, y), radius) = cv2.minEnclosingCircle(c)
-            M = cv2.moments(c)
-            center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
-            
-            if radius > 10 and radius < 85:
-                print(radius)
-                cv2.circle(opencv_image, (int(x), int(y)), int(radius), (0, 255, 255), 2)
-                cv2.circle(opencv_image, center, 5, (0, 0, 255), -1)
-                cv2.waitKey(1)
-                cv2.imshow('dfew', opencv_image)
 
         # find the ball & goal
-        #ball = find_ball.find_ball(grayscale_image)
+        ball = find_ball.find_ball(robot, opencv_image, ball_mask)
         #goal = find_goal.find_goal(robot, opencv_image, goal_mask)
 
         robot.grid_position = robot.grid.worldToGridCoords(robot.position)

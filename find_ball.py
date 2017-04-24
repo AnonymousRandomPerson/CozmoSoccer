@@ -13,7 +13,7 @@ except ImportError:
     sys.exit('install Pillow to run this code')
 
 
-def find_ball(opencv_image, debug=False):
+def find_ball(robot, opencv_image, mask, debug=False):
     """Find the ball in an image.
 
         Arguments:
@@ -23,10 +23,6 @@ def find_ball(opencv_image, debug=False):
 
         Returns [x, y, radius] of the ball, and [0,0,0] or None if no ball is found.
     """
-
-    ball = None
-
-    # INSERT SOLUTION
     #opencv_image = cv2.blur(opencv_image,(7, 7))
 
     # opencv_image = cv2.normalize(opencv_image, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
@@ -35,53 +31,80 @@ def find_ball(opencv_image, debug=False):
     # cv2.imshow('img', opencv_image)
     # cv2.waitKey(0)
     # cv2.destroyAllWindows()
-    ball_keypoints = cv2.HoughCircles(
-        opencv_image, cv2.HOUGH_GRADIENT, 1.3, 7, param1=70, param2=20)
 
-    if ball_keypoints is None:
+    # @TODO test this
+    canny_image = cv2.Canny(mask, 0, 50, apertureSize=5)
+    #cv2.imshow('canny', canny_image)
+    #cv2.imshow('mask', mask)
+    cv2.waitKey(1)
+    IMG_HEIGHT = opencv_image.shape[0]
+    IMG_WIDTH = opencv_image.shape[1]
+
+
+    b, contours, hierarchy = cv2.findContours(
+        canny_image.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Keep top 5
+    contours = sorted(contours, key=cv2.contourArea, reverse=True)[:5]
+    if contours is None:
         return None
 
-    for keypoint in ball_keypoints:
+    center = None
 
-        circ_x = keypoint[0][0]
-        circ_y = keypoint[0][1]
-        circ_rad = keypoint[0][2]
+    for cnt in contours:
+        ((circ_x, circ_y), circ_rad) = cv2.minEnclosingCircle(cnt)
 
-        ## INTENSITY CHECK ##
-        # @TODO Could be too strict if ball gets reflected with light.
-        INTENSITY_THRESHOLD = 50
-        INTENSITY_MIN_RATE = .75
-        count = 0
-        tot_pixels = 0
-        # Fit a square within detected circle.
-        bound = np.floor(np.sqrt(np.square(2 * circ_rad) / 2) / 2)
-        bound_start_x = circ_x - bound
-        bound_start_y = circ_y - bound
+        # @TODO
+        # Ball cannot be above the arena (higher than half of camera's FOV)
+        if circ_y < IMG_HEIGHT / 2:
+            continue
 
-        # Fix bound if negative
-        if bound_start_x < 0:
-            bound_start_x = 0
-        if bound_start_y < 0:
-            bound_start_y = 0
+        M = cv2.moments(cnt)
+        if M["m00"] == 0:
+            continue
 
-        bound_end_x = (bound_start_x + bound * 2)
-        bound_end_y = (bound_start_y + bound * 2)
+        center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+        if circ_rad > 14 and circ_rad < 100:
+            cv2.circle(opencv_image, (int(circ_x), int(circ_y)), int(circ_rad), (0, 255, 255), 2)
+            #cv2.circle(opencv_image, center, 5, (0, 0, 255), -1)
+            ## INTENSITY CHECK ##
+            # @TODO Could be too strict if ball gets reflected with light.
+            INTENSITY_THRESHOLD = 50
+            INTENSITY_MIN_RATE = .75
+            count = 0
+            tot_pixels = 0
+            # Fit a square within detected circle.
+            bound = np.floor(np.sqrt(np.square(2 * circ_rad) / 2) / 2)
+            bound_start_x = circ_x - bound
+            bound_start_y = circ_y - bound
 
-        for y in range(int(bound_start_y), int(bound_end_y)):
-            for x in range(int(bound_start_x), int(bound_end_x)):
-                # Prevent out of bounds
-                if y >= opencv_image.shape[0] or x >= opencv_image.shape[1]:
-                    continue
-                tot_pixels += 1
-                if opencv_image[y, x] < INTENSITY_THRESHOLD:
-                    count += 1
-        if count > INTENSITY_MIN_RATE * tot_pixels:
-            if debug:
-                circles = []
-                circles.append([circ_x, circ_y, circ_rad])
-                display_circles(opencv_image, circles)
-            
-            return [circ_x, circ_y, circ_rad]
+            # Fix bound if negative
+            if bound_start_x < 0:
+                bound_start_x = 0
+            if bound_start_y < 0:
+                bound_start_y = 0
+
+            bound_end_x = (bound_start_x + bound * 2)
+            bound_end_y = (bound_start_y + bound * 2)
+
+            for y in range(int(bound_start_y), int(bound_end_y)):
+                for x in range(int(bound_start_x), int(bound_end_x)):
+                    # Prevent out of bounds
+                    if y >= IMG_HEIGHT or x >= IMG_WIDTH:
+                        continue
+                    tot_pixels += 1
+                    pixel = opencv_image[y,x]
+                    if pixel[0] < 45 and pixel[1] < 45 and pixel[2] < 80:
+                        count += 1
+            if count > INTENSITY_MIN_RATE * tot_pixels:
+                cv2.circle(opencv_image, (int(circ_x), int(circ_y)), int(circ_rad), (0, 255, 255), 2)
+                cv2.circle(opencv_image, center, 5, (255, 0, 255), -1)
+                if debug:
+                    circles = []
+                    circles.append([circ_x, circ_y, circ_rad])
+                    display_circles(opencv_image, circles)
+                #return [circ_x, circ_y, circ_rad]
+    cv2.imshow('img', opencv_image)
 
     return None
 
