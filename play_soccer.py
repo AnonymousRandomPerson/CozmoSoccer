@@ -19,10 +19,11 @@ from state_machine import State, StateMachine
 global grid, gui
 Map_filename = "map_arena.json"
 grid = CozGrid(Map_filename)
-show_grid = True
+show_grid = False
 show_goal = False
-show_ball = False
+show_ball = True
 show_camera = False
+do_movement = False
 if show_grid:
     gui = GUIWindow(grid)
 else:
@@ -57,7 +58,8 @@ async def run(robot: cozmo.robot.Robot):
 
         await update_sensors(robot)
 
-        await robot.stateMachine.update()
+        if do_movement:
+            await robot.stateMachine.update()
 
         await post_update(robot)
 
@@ -81,8 +83,10 @@ async def initialize_robot(robot):
 
     # The normal driving speed of the robot.
     robot.ROBOT_SPEED = 40
-    # The turn speed of the robot when turning.
+    # The turn speed of the robot when path planning.
     robot.TURN_SPEED = 20
+    # The turn speed of the robot when searching.
+    robot.SEARCH_TURN = 30
     # The yaw speed (degrees) of the robot when turning
     robot.TURN_YAW = robot.TURN_SPEED * 1.5
     # The acceleration of the robot.
@@ -91,7 +95,7 @@ async def initialize_robot(robot):
     # robot will tolerate when turning.
     robot.TURN_TOLERANCE = 20
     # The number of frames that the robot will wait before turning during search.
-    robot.TURN_COUNTER = 3
+    robot.TURN_COUNTER = 5
 
     # The length of the robot in mm.
     robot.LENGTH = 90
@@ -191,6 +195,7 @@ async def initialize_robot(robot):
     robot.localized = False
 
     robot.add_odom_position = add_odom_position
+    robot.add_odom_forward = add_odom_forward
     robot.add_odom_rotation = add_odom_rotation
 
 async def update_sensors(robot):
@@ -213,9 +218,9 @@ async def update_sensors(robot):
     # Masks
     goal_mask = cv2.inRange(opencv_image, np.array(
         [25, 25, 125]), np.array([70, 70, 255]))
-    ball_mask =  cv2.inRange(opencv_image, np.array(
-        [40, 30, 40]), np.array([80, 80, 125]))
-    ball_mask = cv2.dilate(ball_mask, None, iterations=2)
+    ball_mask = cv2.inRange(opencv_image, np.array(
+        [25, 25, 20]), np.array([70, 255, 70]))
+    ball_mask = cv2.dilate(ball_mask, None, iterations=1)
 
     # find the ball & goal
     ball = find_ball.find_ball(robot, opencv_image, ball_mask, show_ball)
@@ -258,7 +263,6 @@ async def update_sensors(robot):
         radius = ball[2]
         x = ball[0]
         y = ball[1]
-        print(ball)
 
         width = len(opencv_image[0])
         distance = width / 2 / radius * robot.BALL_RADIUS / robot.TAN_ANGLE + robot.CAMERA_OFFSET
@@ -316,6 +320,18 @@ def add_odom_position(robot, position):
     robot.position = np.add(robot.position, position)
     robot.grid_position = robot.grid.worldToGridCoords(robot.position)
     robot.odom_position = np.add(robot.odom_position, position)
+
+def add_odom_forward(robot, forward):
+    """
+    Registers an odometry reading for moving forward.
+
+    Args:
+        robot: The robot with the odometry reading.
+        position: The distance that the robot moved forward.
+    """
+    rotation_rad = math.radians(robot.rotation)
+    position_offset = np.multiply((math.cos(rotation_rad), math.sin(rotation_rad)), forward)
+    robot.add_odom_position(robot, position_offset)
 
 def add_odom_rotation(robot, rotation):
     """

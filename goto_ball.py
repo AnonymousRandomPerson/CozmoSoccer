@@ -11,7 +11,7 @@ import cozmo
 import cv2
 import find_ball, find_goal
 import numpy as np
-from cozmo.util import Angle, degrees, distance_mm, speed_mmps
+from cozmo.util import Angle, degrees, radians, distance_mm, speed_mmps
 
 import planning
 import play_soccer
@@ -47,18 +47,20 @@ async def hitBall(robot):
         robot: The object representing Cozmo.
     """
     robot.stop_all_motors()
-    await doActionWithTimeout(robot.drive_straight(distance_mm(2 * robot.BACK_DISTANCE), speed_mmps(robot.HIT_SPEED)), 5)
+    distance = 2 * robot.BACK_DISTANCE
+    await doActionWithTimeout(robot.drive_straight(distance_mm(distance), speed_mmps(robot.HIT_SPEED)), 5)
+    robot.add_odom_forward(robot, distance)
 
 
 class StateTemplate(State):
     """
     """
 
-    async def update(self, owner):
+    async def update(self, robot):
         """Executes the state's behavior for the current tick.
 
         Args:
-            owner: The object to affect behavior for.
+            robot: The object to affect behavior for.
         
         Returns:
             If the object's state should be changed, returns the class of the new state.
@@ -83,52 +85,62 @@ class Search(State):
         if args:
             self._TURN_DIRECTION = -1
         self.turning = False
-        self.counter = 0
+        self.turn_timer = 0
         self.first = True
 
-    async def update(self, owner):
+    async def update(self, robot):
         """Executes the state's behavior for the current tick.
 
         Args:
-            owner: The object to affect behavior for.
+            robot: The object to affect behavior for.
         
         Returns:
             If the object's state should be changed, returns the class of the new state.
             Otherwise, return None.
         """
-        if self.first:
-            self.counter = owner.TURN_COUNTER
+        if self.first or self.move_timer <= 0:
+            self.turn_timer = robot.TURN_COUNTER
+            self.move_timer = 360 * 2.25 / robot.TURN_COUNTER
             self.first = False
-            return
-        if self.turning:
-            owner.add_odom_rotation(owner, owner.TURN_YAW * owner.delta_time * self._TURN_DIRECTION * -1)
-        if owner.localized and owner.ball is not None:
-            await owner.drive_wheels(0, 0, owner.ROBOT_ACCELERATION, owner.ROBOT_ACCELERATION)
+        if robot.localized and robot.ball is not None:
+            await robot.drive_wheels(0, 0, robot.ROBOT_ACCELERATION, robot.ROBOT_ACCELERATION)
             return planning.PathPlan()
-        if self.counter <= 0:
-            self.counter = 
-        turn_speed = owner.TURN_SPEED * self._TURN_DIRECTION
-        await owner.drive_wheels(turn_speed, -turn_speed, owner.ROBOT_ACCELERATION, owner.ROBOT_ACCELERATION)
-        self.turning = True
+        self.move_timer -= 1
+        if self.move_timer <= 0:
+            distance = robot.BACK_DISTANCE
+            await doActionWithTimeout(robot.drive_straight(distance_mm(distance), speed_mmps(robot.HIT_SPEED)), 5)
+            robot.add_odom_forward(robot, distance)
+        elif self.turn_timer > 0:
+            self.turn_timer -= 1
+        else:
+            await doActionWithTimeout(robot.turn_in_place(degrees(robot.SEARCH_TURN), num_retries = 3), 0.5)
+            robot.add_odom_rotation(robot, robot.SEARCH_TURN)
+            self.turn_timer = robot.TURN_COUNTER
 
 class HitBall(State):
     """Moves Cozmo's arm to hit the ball."""
 
-    async def update(self, owner):
+    async def update(self, robot):
         """
         Executes the state's behavior for the current tick.
 
         Args:
-            owner: The object to affect behavior for.
+            robot: The object to affect behavior for.
         
         Returns:
             If the object's state should be changed, returns the class of the new state.
             Otherwise, return None.
         """
-        owner.stop_all_motors()
-        await hitBall(owner)
-        owner.ball = None
-        owner.ball_grid = None
+        rotation_rad = math.radians(robot.rotation)
+        turn = planning.getTurnDirection(math.cos(rotation_rad), math.sin(rotation_rad), robot.position, robot.ball)
+        robot.stop_all_motors()
+        await robot.turn_in_place(radians(turn), num_retries = 3).wait_for_completed()
+        robot.add_odom_rotation(robot, math.degrees(turn))
+
+        robot.stop_all_motors()
+        await hitBall(robot)
+        robot.ball = None
+        robot.ball_grid = None
         return Search()
 
 

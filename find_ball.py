@@ -37,7 +37,7 @@ def find_ball(robot, opencv_image, mask, debug=False):
     if debug:
         cv2.waitKey(1)
         #cv2.imshow('canny', canny_image)
-        #cv2.imshow('mask', mask)
+        cv2.imshow('mask', mask)
     IMG_HEIGHT = opencv_image.shape[0]
     IMG_WIDTH = opencv_image.shape[1]
 
