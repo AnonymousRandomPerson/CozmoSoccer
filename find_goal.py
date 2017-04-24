@@ -16,7 +16,7 @@ except ImportError:
     sys.exit('install Pillow to run this code')
 
 
-def find_goal(robot, opencv_image, mask, debug=True):
+def find_goal(robot, opencv_image, mask, debug=False):
     """Find the goal in an image.
 
         Arguments:
@@ -158,7 +158,8 @@ def find_goal(robot, opencv_image, mask, debug=True):
                 cv2.imshow('processed img', opencv_image)
             return robot_position, robot_rotation
 
-    cv2.imshow('processed img', opencv_image)
+    if show_gui:
+        cv2.imshow('processed img', opencv_image)
     return None, None
 
 

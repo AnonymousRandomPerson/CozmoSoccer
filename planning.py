@@ -116,6 +116,10 @@ class PathPlan(State):
             If the object's state should be changed, returns the class of the new state.
             Otherwise, return None.
         """
+        if self.first:
+            robot.was_turning = False
+            robot.was_driving = False
+
         rotation_cos = math.cos(robot.rotation)
         rotation_sin = math.sin(robot.rotation)
         if robot.was_driving:
@@ -185,8 +189,10 @@ class PathPlan(State):
                 robot.next_cell = path[1]
 
             turn = getTurnDirection(rotation_cos, rotation_sin, rounded_grid, robot.next_cell)
+            print(robot.rotation, rounded_grid, robot.next_cell, turn)
             if abs(turn) > robot.TURN_THRESHOLD and abs(2 * math.pi - abs(turn)) > robot.TURN_THRESHOLD:
                 robot.stop_all_motors()
+                print(turn)
                 await robot.turn_in_place(radians(turn), num_retries=3).wait_for_completed()
                 robot.add_odom_rotation(robot, turn)
                 robot.was_driving = False
@@ -219,8 +225,10 @@ def getTurnDirection(rotation_cos, rotation_sin, current, next):
     Returns:
         The direction that the robot needs to turn to face a position.
     """
-    forward = (round(rotation_cos), round(rotation_sin))
-    target_direction = tuple(next[i] - current[i] for i in range(len(next)))
+    forward = (rotation_cos, rotation_sin)
+    target_direction = np.subtract(next, current)
+    if (target_direction == [0, 0]).all():
+        return 0
     turn = math.atan2(target_direction[1], target_direction[0]) - math.atan2(forward[1], forward[0])
     return turn
 

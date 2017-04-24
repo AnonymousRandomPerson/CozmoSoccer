@@ -21,7 +21,7 @@ Map_filename = "map_arena.json"
 grid = CozGrid(Map_filename)
 show_grid = True
 show_goal = False
-show_ball = False
+show_ball = True
 show_camera = False
 if show_grid:
     gui = GUIWindow(grid)
@@ -84,7 +84,7 @@ async def initialize_robot(robot):
     # The turn speed of the robot when turning.
     robot.TURN_SPEED = 20
     # The yaw speed (degrees) of the robot when turning
-    robot.TURN_YAW = robot.TURN_SPEED * 1.38
+    robot.TURN_YAW = robot.TURN_SPEED * 1.5
     # The acceleration of the robot.
     robot.ROBOT_ACCELERATION = 1000
     # The amount of difference between the target and actual angles that the
@@ -175,7 +175,7 @@ async def initialize_robot(robot):
     robot.goal_position = (robot.grid.width * robot.grid.scale, robot.grid.height / 2 * robot.grid.scale)
 
     # The robot's odometry readings for position on the current frame.
-    robot.odom_position = [0, 0]
+    robot.odom_position = np.array([0, 0])
     # The robot's odometry readings for rotation on the current frame.
     robot.odom_rotation = 0
 
@@ -185,6 +185,8 @@ async def initialize_robot(robot):
     robot.rotation_queue = queue.Queue()
     # The number of readings that are saved in queues.
     robot.QUEUE_SIZE = 5
+    # Whether the robot has localized itself with the goal.
+    robot.localized = False
 
     robot.add_odom_position = add_odom_position
     robot.add_odom_rotation = add_odom_rotation
@@ -210,7 +212,7 @@ async def update_sensors(robot):
     goal_mask = cv2.inRange(opencv_image, np.array(
         [25, 25, 125]), np.array([70, 70, 255]))
     ball_mask =  cv2.inRange(opencv_image, np.array(
-        [0, 0, 0]), np.array([45, 45, 80]))
+        [40, 30, 40]), np.array([80, 80, 125]))
     ball_mask = cv2.dilate(ball_mask, None, iterations=2)
 
     # find the ball & goal
@@ -219,16 +221,25 @@ async def update_sensors(robot):
     guessed_position, guessed_rotation = find_goal.find_goal(robot, opencv_image, goal_mask, show_goal)
     if guessed_position is not None:
         guessed_rotation = math.degrees(guessed_rotation)
-        guessed_rotation %= math.pi * 2
+        guessed_rotation %= 360
+        print(guessed_rotation)
         robot.position_queue.put(guessed_position)
         if robot.position_queue.qsize() > robot.QUEUE_SIZE:
             robot.position_queue.get()
+            robot.localized = True
         robot.position = np.mean(list(robot.position_queue.queue), axis = 0)
 
         robot.rotation_queue.put(guessed_rotation)
         if robot.rotation_queue.qsize() > robot.QUEUE_SIZE:
             robot.rotation_queue.get()
-        robot.rotation = np.mean(list(robot.rotation_queue.queue))
+        rotation_vectors = []
+        for rotation in robot.rotation_queue.queue:
+            rotation_rad = math.radians(rotation)
+            rotation_vector = (math.cos(rotation_rad), math.sin(rotation_rad))
+            rotation_vectors.append(rotation_vector)
+        average_vector = np.mean(rotation_vectors, axis = 0)
+        print(average_vector)
+        robot.rotation = (math.degrees(math.atan2(*average_vector)) - 90) % 360
     else:
         robot.position_queue = queue.Queue()
         robot.rotation_queue = queue.Queue()
@@ -259,9 +270,6 @@ async def update_sensors(robot):
         ball_offset = np.add(ball_offset, np.multiply((rotation_sin, -rotation_cos), side_offset))
         robot.ball = np.add(robot.position, ball_offset)
         robot.ball_grid = robot.grid.worldToGridCoords(robot.ball)
-    else:
-        robot.ball = None
-        robot.ball_grid = None
     if robot.prev_ball is not None:
         robot.prev_ball_grid = robot.grid.worldToGridCoords(
             robot.prev_ball)
@@ -281,17 +289,17 @@ async def post_update(robot):
 
     current_queue_size = robot.position_queue.qsize()
     for i in range(current_queue_size):
-        if robot.odom_position != [0, 0]:
+        if (robot.odom_position != [0, 0]).any():
             pos = robot.position_queue.get()
             pos = np.add(pos, robot.odom_position)
             robot.position_queue.put(pos)
         if robot.odom_rotation != 0:
             rot = robot.rotation_queue.get()
             rot = rot + robot.odom_rotation
-            rot %= math.pi * 2
+            rot %= 360
             robot.rotation_queue.put(rot)
 
-    robot.odom_position = [0, 0]
+    robot.odom_position = np.array([0, 0])
     robot.odom_rotation = 0
 
 def add_odom_position(robot, position):
@@ -315,7 +323,7 @@ def add_odom_rotation(robot, rotation):
         rotation: The rotation reading offset.
     """
     robot.rotation = np.add(robot.rotation, rotation)
-    robot.rotation %= math.pi * 2
+    robot.rotation %= 360
     robot.odom_rotation = np.add(robot.odom_rotation, rotation)
 
 class CozmoThread(threading.Thread):

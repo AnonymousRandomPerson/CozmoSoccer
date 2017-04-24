@@ -34,10 +34,10 @@ def find_ball(robot, opencv_image, mask, debug=False):
 
     # @TODO test this
     canny_image = cv2.Canny(mask, 0, 50, apertureSize=5)
-    #cv2.imshow('canny', canny_image)
-    #cv2.imshow('mask', mask)
     if debug:
         cv2.waitKey(1)
+        #cv2.imshow('canny', canny_image)
+        #cv2.imshow('mask', mask)
     IMG_HEIGHT = opencv_image.shape[0]
     IMG_WIDTH = opencv_image.shape[1]
 
@@ -71,7 +71,7 @@ def find_ball(robot, opencv_image, mask, debug=False):
             ## INTENSITY CHECK ##
             # @TODO Could be too strict if ball gets reflected with light.
             INTENSITY_THRESHOLD = 50
-            INTENSITY_MIN_RATE = .75
+            INTENSITY_MIN_RATE = .55
             count = 0
             tot_pixels = 0
             # Fit a square within detected circle.
@@ -95,16 +95,12 @@ def find_ball(robot, opencv_image, mask, debug=False):
                         continue
                     tot_pixels += 1
                     pixel = opencv_image[y,x]
-                    if pixel[0] < 45 and pixel[1] < 45 and pixel[2] < 80:
+                    if pixel[0] < 80 and pixel[1] < 80 and pixel[2] < 125 and pixel[0] > 40 and pixel[1] > 30 and pixel[2] > 40:
                         count += 1
             if count > INTENSITY_MIN_RATE * tot_pixels:
-                cv2.circle(opencv_image, (int(circ_x), int(circ_y)), int(circ_rad), (0, 255, 255), 2)
-                cv2.circle(opencv_image, center, 5, (255, 0, 255), -1)
                 if debug:
-                    circles = []
-                    circles.append([circ_x, circ_y, circ_rad])
-                    display_circles(opencv_image, circles)
-                #return [circ_x, circ_y, circ_rad]
+                    cv2.circle(opencv_image, center, 5, (255, 0, 255), -1)
+                return [circ_x, circ_y, circ_rad]
     if debug:
         cv2.imshow('img', opencv_image)
 

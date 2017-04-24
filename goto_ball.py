@@ -97,7 +97,7 @@ class Search(State):
         """
         if self.turning:
             owner.add_odom_rotation(owner, owner.TURN_YAW * owner.delta_time * self._TURN_DIRECTION * -1)
-        if owner.ball is not None:
+        if owner.localized and owner.ball is not None:
             await owner.drive_wheels(0, 0, owner.ROBOT_ACCELERATION, owner.ROBOT_ACCELERATION)
             return planning.PathPlan()
         turn_speed = owner.TURN_SPEED * self._TURN_DIRECTION
@@ -120,6 +120,8 @@ class HitBall(State):
         """
         owner.stop_all_motors()
         await hitBall(owner)
+        owner.ball = None
+        owner.ball_grid = None
         return Search()
 
 
