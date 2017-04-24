@@ -100,9 +100,10 @@ def find_ball(robot, opencv_image, mask, debug=False):
             if count > INTENSITY_MIN_RATE * tot_pixels:
                 if debug:
                     cv2.circle(opencv_image, center, 5, (255, 0, 255), -1)
+                    cv2.imshow('Ball', opencv_image)
                 return [circ_x, circ_y, circ_rad]
     if debug:
-        cv2.imshow('img', opencv_image)
+        cv2.imshow('Ball', opencv_image)
 
     return None
 

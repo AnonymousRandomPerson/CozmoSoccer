@@ -120,8 +120,9 @@ class PathPlan(State):
             robot.was_turning = False
             robot.was_driving = False
 
-        rotation_cos = math.cos(robot.rotation)
-        rotation_sin = math.sin(robot.rotation)
+        rotation_rad = math.radians(robot.rotation)
+        rotation_cos = math.cos(rotation_rad)
+        rotation_sin = math.sin(rotation_rad)
         if robot.was_driving:
             speed_delta = robot.delta_time * robot.ROBOT_SPEED
 
@@ -185,16 +186,14 @@ class PathPlan(State):
         robot.was_turning = False
         if path is not None and len(path) > 1:
             robot.next_cell = path[0]
-            if path[0] == robot.grid_position:
+            if path[0] == rounded_grid:
                 robot.next_cell = path[1]
 
             turn = getTurnDirection(rotation_cos, rotation_sin, rounded_grid, robot.next_cell)
-            print(robot.rotation, rounded_grid, robot.next_cell, turn)
             if abs(turn) > robot.TURN_THRESHOLD and abs(2 * math.pi - abs(turn)) > robot.TURN_THRESHOLD:
                 robot.stop_all_motors()
-                print(turn)
                 await robot.turn_in_place(radians(turn), num_retries=3).wait_for_completed()
-                robot.add_odom_rotation(robot, turn)
+                robot.add_odom_rotation(robot, math.degrees(turn))
                 robot.was_driving = False
             else:
                 await robot.drive_wheels(robot.ROBOT_SPEED, robot.ROBOT_SPEED, robot.ROBOT_ACCELERATION, robot.ROBOT_ACCELERATION)
@@ -206,7 +205,7 @@ class PathPlan(State):
                 robot.stop_all_motors()
                 if abs(turn) > robot.TURN_THRESHOLD and abs(2 * math.pi - abs(turn)) > robot.TURN_THRESHOLD:
                     await robot.turn_in_place(radians(turn), num_retries=3).wait_for_completed()
-                    robot.add_odom_rotation(robot, turn)
+                    robot.add_odom_rotation(robot, math.degrees(turn))
                 return goto_ball.HitBall()
             else:
                 await robot.drive_wheels(robot.TURN_SPEED, -robot.TURN_SPEED, robot.ROBOT_ACCELERATION, robot.ROBOT_ACCELERATION)

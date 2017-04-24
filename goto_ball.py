@@ -46,7 +46,6 @@ async def hitBall(robot):
     Args:
         robot: The object representing Cozmo.
     """
-    await doActionWithTimeout(robot.drive_straight(distance_mm(-robot.BACK_DISTANCE), speed_mmps(robot.HIT_SPEED)), 1)
     robot.stop_all_motors()
     await doActionWithTimeout(robot.drive_straight(distance_mm(2 * robot.BACK_DISTANCE), speed_mmps(robot.HIT_SPEED)), 5)
 
@@ -84,6 +83,8 @@ class Search(State):
         if args:
             self._TURN_DIRECTION = -1
         self.turning = False
+        self.counter = 0
+        self.first = True
 
     async def update(self, owner):
         """Executes the state's behavior for the current tick.
@@ -95,11 +96,17 @@ class Search(State):
             If the object's state should be changed, returns the class of the new state.
             Otherwise, return None.
         """
+        if self.first:
+            self.counter = owner.TURN_COUNTER
+            self.first = False
+            return
         if self.turning:
             owner.add_odom_rotation(owner, owner.TURN_YAW * owner.delta_time * self._TURN_DIRECTION * -1)
         if owner.localized and owner.ball is not None:
             await owner.drive_wheels(0, 0, owner.ROBOT_ACCELERATION, owner.ROBOT_ACCELERATION)
             return planning.PathPlan()
+        if self.counter <= 0:
+            self.counter = 
         turn_speed = owner.TURN_SPEED * self._TURN_DIRECTION
         await owner.drive_wheels(turn_speed, -turn_speed, owner.ROBOT_ACCELERATION, owner.ROBOT_ACCELERATION)
         self.turning = True

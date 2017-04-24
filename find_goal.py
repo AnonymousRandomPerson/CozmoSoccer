@@ -30,12 +30,10 @@ def find_goal(robot, opencv_image, mask, debug=False):
 
     if show_gui:
         cv2.waitKey(1)
-    # Process Image
-    # opencv_image = cv2.bitwise_and(opencv_image, opencv_image, mask = mask)
 
     canny_image = cv2.Canny(mask, 0, 50, apertureSize=5)
     if show_gui:
-        cv2.imshow('canny', canny_image)
+        cv2.imshow('Canny Goal', canny_image)
 
     b, contours, hierarchy = cv2.findContours(
         canny_image.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -145,7 +143,7 @@ def find_goal(robot, opencv_image, mask, debug=False):
                 cv2.line(opencv_image, origin, tuple(img_points[2][0]), (0, 255, 0), thickness = axisThickness)
                 cv2.line(opencv_image, origin, tuple(img_points[3][0]), (255, 0, 0), thickness = axisThickness)
 
-                drawRectangle = False
+                drawRectangle = True
                 if drawRectangle:
                     rectThickness = 2
                     rectColor = (0, 255, 255)
@@ -155,11 +153,11 @@ def find_goal(robot, opencv_image, mask, debug=False):
                     cv2.line(opencv_image, tuple(top_min_point), tuple(bottom_min_point), rectColor, thickness = rectThickness)
 
                     cv2.drawContours(opencv_image, [cnt], -1, (255, 0, 0), 1)
-                cv2.imshow('processed img', opencv_image)
+                cv2.imshow('Goal', opencv_image)
             return robot_position, robot_rotation
 
     if show_gui:
-        cv2.imshow('processed img', opencv_image)
+        cv2.imshow('Goal', opencv_image)
     return None, None
 
 

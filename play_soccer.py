@@ -21,7 +21,7 @@ Map_filename = "map_arena.json"
 grid = CozGrid(Map_filename)
 show_grid = True
 show_goal = False
-show_ball = True
+show_ball = False
 show_camera = False
 if show_grid:
     gui = GUIWindow(grid)
@@ -90,6 +90,8 @@ async def initialize_robot(robot):
     # The amount of difference between the target and actual angles that the
     # robot will tolerate when turning.
     robot.TURN_TOLERANCE = 20
+    # The number of frames that the robot will wait before turning during search.
+    robot.TURN_COUNTER = 3
 
     # The length of the robot in mm.
     robot.LENGTH = 90
@@ -184,7 +186,7 @@ async def initialize_robot(robot):
     # Queue for rotation localization readings.
     robot.rotation_queue = queue.Queue()
     # The number of readings that are saved in queues.
-    robot.QUEUE_SIZE = 5
+    robot.QUEUE_SIZE = 3
     # Whether the robot has localized itself with the goal.
     robot.localized = False
 
@@ -220,26 +222,26 @@ async def update_sensors(robot):
     #ball = (160, 100, 70)
     guessed_position, guessed_rotation = find_goal.find_goal(robot, opencv_image, goal_mask, show_goal)
     if guessed_position is not None:
-        guessed_rotation = math.degrees(guessed_rotation)
-        guessed_rotation %= 360
-        print(guessed_rotation)
-        robot.position_queue.put(guessed_position)
-        if robot.position_queue.qsize() > robot.QUEUE_SIZE:
-            robot.position_queue.get()
-            robot.localized = True
-        robot.position = np.mean(list(robot.position_queue.queue), axis = 0)
+        grid_guess = robot.grid.worldToGridCoords(guessed_position)
+        if robot.grid.coordInBounds(grid_guess):
+            guessed_rotation = math.degrees(-guessed_rotation)
+            guessed_rotation %= 360
+            robot.position_queue.put(guessed_position)
+            if robot.position_queue.qsize() > robot.QUEUE_SIZE:
+                robot.position_queue.get()
+                robot.localized = True
+            robot.position = np.mean(list(robot.position_queue.queue), axis = 0)
 
-        robot.rotation_queue.put(guessed_rotation)
-        if robot.rotation_queue.qsize() > robot.QUEUE_SIZE:
-            robot.rotation_queue.get()
-        rotation_vectors = []
-        for rotation in robot.rotation_queue.queue:
-            rotation_rad = math.radians(rotation)
-            rotation_vector = (math.cos(rotation_rad), math.sin(rotation_rad))
-            rotation_vectors.append(rotation_vector)
-        average_vector = np.mean(rotation_vectors, axis = 0)
-        print(average_vector)
-        robot.rotation = (math.degrees(math.atan2(*average_vector)) - 90) % 360
+            robot.rotation_queue.put(guessed_rotation)
+            if robot.rotation_queue.qsize() > robot.QUEUE_SIZE:
+                robot.rotation_queue.get()
+            rotation_vectors = []
+            for rotation in robot.rotation_queue.queue:
+                rotation_rad = math.radians(rotation)
+                rotation_vector = (math.cos(rotation_rad), math.sin(rotation_rad))
+                rotation_vectors.append(rotation_vector)
+            average_vector = np.mean(rotation_vectors, axis = 0)
+            robot.rotation = (math.degrees(math.atan2(*average_vector)) - 90) % 360
     else:
         robot.position_queue = queue.Queue()
         robot.rotation_queue = queue.Queue()
@@ -256,6 +258,7 @@ async def update_sensors(robot):
         radius = ball[2]
         x = ball[0]
         y = ball[1]
+        print(ball)
 
         width = len(opencv_image[0])
         distance = width / 2 / radius * robot.BALL_RADIUS / robot.TAN_ANGLE + robot.CAMERA_OFFSET
