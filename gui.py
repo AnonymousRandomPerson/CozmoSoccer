@@ -262,25 +262,25 @@ class GUIWindow():
 
     def update(self):
         
-        #self.grid.lock.acquire()
+        self.grid.lock.acquire()
         self._show_mean(self.mean_x, self.mean_y, self.mean_heading, self.mean_confident)
         
-        # if 'path' in self.grid.changes:
-        #     self.drawpath()
-        # if 'visited' in self.grid.changes:
-        #     self.drawnewvisited()
-        # if 'allvisited' in self.grid.changes:
-        #     self.drawallvisited()
-        # if 'goals' in self.grid.changes:
-        #     self.drawgoals()
-        # if 'start' in self.grid.changes:
-        #     self.drawstart()
-        # if 'obstacles' in self.grid.changes:
-        #     self.drawobstacles()
+        if 'path' in self.grid.changes:
+            self.drawpath()
+        if 'visited' in self.grid.changes:
+            self.drawnewvisited()
+        if 'allvisited' in self.grid.changes:
+            self.drawallvisited()
+        if 'goals' in self.grid.changes:
+            self.drawgoals()
+        if 'start' in self.grid.changes:
+            self.drawstart()
+        if 'obstacles' in self.grid.changes:
+            self.drawobstacles()
 
-        # self.grid.changes = []
-        # self.grid.updated.clear()
-        # self.grid.lock.release()
+        self.grid.changes = []
+        self.grid.updated.clear()
+        self.grid.lock.release()
         self.updated.clear()
 
     # start GUI thread

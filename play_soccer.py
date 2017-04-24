@@ -19,8 +19,8 @@ from state_machine import State, StateMachine
 global grid, gui
 Map_filename = "map_arena.json"
 grid = CozGrid(Map_filename)
-show_grid = False
-show_goal = True
+show_grid = True
+show_goal = False
 show_ball = False
 show_camera = False
 if show_grid:
@@ -208,9 +208,11 @@ async def update_sensors(robot):
 
     # find the ball & goal
     ball = find_ball.find_ball(robot, opencv_image, ball_mask, show_ball)
+    robot.ball = (100, 100, 50)
     guessed_position, guessed_rotation = find_goal.find_goal(robot, opencv_image, goal_mask, show_goal)
     if guessed_position != None:
         guessed_rotation = math.degrees(guessed_rotation)
+        guessed_rotation %= math.pi * 2
         robot.position_queue.put(guessed_position)
         if robot.position_queue.qsize() > robot.QUEUE_SIZE:
             robot.position_queue.get()
@@ -263,6 +265,7 @@ async def post_update(robot):
         if robot.odom_rotation != 0:
             rot = robot.rotation_queue.get()
             rot = rot + robot.odom_rotation
+            rot %= math.pi * 2
             robot.rotation_queue.put(rot)
 
     robot.odom_position = [0, 0]
@@ -277,6 +280,7 @@ def add_odom_position(robot, position):
         position: The position reading offset.
     """
     robot.position = np.add(robot.position, position)
+    robot.grid_position = robot.grid.worldToGridCoords(robot.position)
     robot.odom_position = np.add(robot.odom_position, position)
 
 def add_odom_rotation(robot, rotation):
@@ -288,6 +292,7 @@ def add_odom_rotation(robot, rotation):
         rotation: The rotation reading offset.
     """
     robot.rotation = np.add(robot.rotation, rotation)
+    robot.rotation %= math.pi * 2
     robot.odom_rotation = np.add(robot.odom_rotation, rotation)
 
 class CozmoThread(threading.Thread):

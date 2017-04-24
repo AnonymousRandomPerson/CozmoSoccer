@@ -108,20 +108,17 @@ class PathPlan(State):
             If the object's state should be changed, returns the class of the new state.
             Otherwise, return None.
         """
-
-        robot.rotation %= math.pi * 2
         rotation_cos = math.cos(robot.rotation)
         rotation_sin = math.sin(robot.rotation)
         if robot.was_driving:
             speed_delta = robot.delta_time * robot.ROBOT_SPEED
 
-            robot.position = (robot.position[0] + rotation_cos * robot.speed_delta, robot.position[1] + rotation_sin * robot.speed_delta)
-            robot.grid_position = robot.grid.worldToGridCoords(robot.position)
+            robot.add_odom_position(robot, (rotation_cos * robot.speed_delta, rotation_sin * robot.speed_delta))
             robot.grid.setStart(robot.grid_position)
         else:
             robot.drive_timer = robot.DRIVE_COOLDOWN
         if robot.was_turning:
-            robot.rotation += robot.TURN_YAW * robot.delta_time
+            robot.add_odom_rotation(robot, robot.TURN_YAW * robot.delta_time)
 
         changed = False
         if robot.ball:
@@ -141,7 +138,6 @@ class PathPlan(State):
                 grid_points = getGridPoints(robot.ball_grid[0], robot.ball_grid[1], robot)
                 for point in grid_points:
                     if robot.grid.coordInBounds(point):
-                        print(point)
                         robot.grid.addObstacle(point)
 
             # Wall obstacles.
@@ -168,7 +164,7 @@ class PathPlan(State):
             if abs(turn) > robot.TURN_THRESHOLD and abs(2 * math.pi - abs(turn)) > robot.TURN_THRESHOLD:
                 robot.stop_all_motors()
                 await robot.turn_in_place(radians(turn), num_retries=3).wait_for_completed()
-                robot.rotation += turn
+                robot.add_odom_rotation(robot, turn)
                 robot.was_driving = False
             else:
                 await robot.drive_wheels(robot.ROBOT_SPEED, robot.ROBOT_SPEED, robot.ROBOT_ACCELERATION, robot.ROBOT_ACCELERATION)
@@ -180,7 +176,7 @@ class PathPlan(State):
                 robot.stop_all_motors()
                 if abs(turn) > robot.TURN_THRESHOLD and abs(2 * math.pi - abs(turn)) > robot.TURN_THRESHOLD:
                     await robot.turn_in_place(radians(turn), num_retries=3).wait_for_completed()
-                    robot.rotation += turn
+                    robot.add_odom_rotation(robot, turn)
                     return goto_ball.Approach()
             else:
                 await robot.drive_wheels(robot.TURN_SPEED, -robot.TURN_SPEED, robot.ROBOT_ACCELERATION, robot.ROBOT_ACCELERATION)
@@ -200,6 +196,7 @@ def getTurnDirection(rotation_cos, rotation_sin, current, next):
         The direction that the robot needs to turn to face a position.
     """
     forward = (round(rotation_cos), round(rotation_sin))
+    print(next, current)
     target_direction = tuple(next[i] - current[i] for i in range(len(next)))
     turn = math.atan2(target_direction[1], target_direction[0]) - math.atan2(forward[1], forward[0])
     return turn
