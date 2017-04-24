@@ -23,26 +23,6 @@ except ImportError:
 
 from state_machine import State, StateMachine
 
-# Define a decorator as a subclass of Annotator; displays the ball
-class BallAnnotator(cozmo.annotate.Annotator):
-    ball = None
-
-    def apply(self, image, scale):
-        d = ImageDraw.Draw(image)
-        bounds = (0, 0, image.width, image.height)
-
-        if BallAnnotator.ball is None: return
-
-        # double size of bounding box to match size of rendered image
-        scaledBall = np.multiply(BallAnnotator.ball, 2)
-
-        # define and display bounding box with params:
-        # msg.img_topLeft_x, msg.img_topLeft_y, msg.img_width, msg.img_height
-        box = cozmo.util.ImageBox(scaledBall[0] - scaledBall[2],
-                                  scaledBall[1] - scaledBall[2],
-                                  scaledBall[2] * 2, scaledBall[2] * 2)
-        cozmo.annotate.add_img_box_to_image(image, box, "green", text=None)
-
 async def doActionWithTimeout(action, timeout):
     """Executes an action, canceling it after a certain amount of time if it doesn't finish.
 
@@ -94,8 +74,6 @@ class Search(State):
     """Searches for the ball.
     """
 
-    """The amount to turn each time the robot turns while searching for a ball."""
-    _TURN_SPEED = 0
     """The direction that the robot will turn in."""
     _TURN_DIRECTION = 1
 
@@ -107,6 +85,7 @@ class Search(State):
         """
         if args:
             self._TURN_DIRECTION = -1
+        self.turning = False
 
     async def update(self, owner):
         """Executes the state's behavior for the current tick.
@@ -118,11 +97,14 @@ class Search(State):
             If the object's state should be changed, returns the class of the new state.
             Otherwise, return None.
         """
+        if self.turning:
+            owner.add_odom_rotation(owner, owner.TURN_YAW * owner.delta_time * self._TURN_DIRECTION * -1)
         if owner.ball:
-            await owner.drive_wheels(0, 0, 500, 500)
+            await owner.drive_wheels(0, 0, owner.ROBOT_ACCELERATION, owner.ROBOT_ACCELERATION)
             return planning.PathPlan()
-        turn_speed = self._TURN_SPEED * self._TURN_DIRECTION
-        await owner.drive_wheels(turn_speed, -turn_speed, 500, 500)
+        turn_speed = owner.TURN_SPEED * self._TURN_DIRECTION
+        await owner.drive_wheels(turn_speed, -turn_speed, owner.ROBOT_ACCELERATION, owner.ROBOT_ACCELERATION)
+        self.turning = True
 
 
 class Approach(State):

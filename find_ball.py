@@ -36,7 +36,8 @@ def find_ball(robot, opencv_image, mask, debug=False):
     canny_image = cv2.Canny(mask, 0, 50, apertureSize=5)
     #cv2.imshow('canny', canny_image)
     #cv2.imshow('mask', mask)
-    cv2.waitKey(1)
+    if debug:
+        cv2.waitKey(1)
     IMG_HEIGHT = opencv_image.shape[0]
     IMG_WIDTH = opencv_image.shape[1]
 
@@ -104,7 +105,8 @@ def find_ball(robot, opencv_image, mask, debug=False):
                     circles.append([circ_x, circ_y, circ_rad])
                     display_circles(opencv_image, circles)
                 #return [circ_x, circ_y, circ_rad]
-    cv2.imshow('img', opencv_image)
+    if debug:
+        cv2.imshow('img', opencv_image)
 
     return None
 

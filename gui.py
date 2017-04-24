@@ -77,7 +77,9 @@ class GUIWindow():
         else:
             color = "#CCCCCC"
         location = (x,y)
-        self.colorTriangle(location, heading_deg, color,tri_size=20)
+        robot_tag = 'robot'
+        self.canvas.delete(robot_tag)
+        self.colorTriangle(location, heading_deg, color,tri_size=20,tags=robot_tag)
 
 
     def _show_particles(self, particles):
@@ -134,17 +136,17 @@ class GUIWindow():
         # print(x0,y0,x1,y1)
         return self.canvas.create_oval(x0, y0, x1, y1, fill=color)
 
-    def colorLine(self, coord1, coord2, color='black', linewidth=1, dashed=False):
+    def colorLine(self, coord1, coord2, color='black', linewidth=1, dashed=False, tags=''):
         if dashed:
             self.canvas.create_line(coord1[0] * self.grid.scale, (self.height-coord1[1])* self.grid.scale, \
                 coord2[0] * self.grid.scale, (self.height-coord2[1]) * self.grid.scale,  \
-                fill=color, width=linewidth, dash=(5,3))
+                fill=color, width=linewidth, dash=(5,3), tags=tags)
         else:
             self.canvas.create_line(coord1[0] * self.grid.scale, (self.height-coord1[1])* self.grid.scale, \
                 coord2[0] * self.grid.scale, (self.height-coord2[1]) * self.grid.scale,  \
-                fill=color, width=linewidth)
+                fill=color, width=linewidth, tags=tags)
 
-    def colorTriangle(self, location, heading_deg, color, tri_size):
+    def colorTriangle(self, location, heading_deg, color, tri_size, tags=None):
         hx, hy = rotate_point(tri_size, 0, heading_deg)
         lx, ly = rotate_point(-tri_size, tri_size, heading_deg)
         rx, ry = rotate_point(-tri_size, -tri_size, heading_deg)
@@ -153,28 +155,7 @@ class GUIWindow():
         lrot = (lx + location[0]*self.grid.scale, -ly + (self.height-location[1])*self.grid.scale)
         rrot = (rx + location[0]*self.grid.scale, -ry + (self.height-location[1])*self.grid.scale)
         return self.canvas.create_polygon(hrot[0], hrot[1], lrot[0], lrot[1], rrot[0], rrot[1], \
-            fill=color, outline='#000000',width=1)
-
-    """
-    Sync data to plot from other thread
-    """
-    def show_mean(self, x, y, heading_deg, confident=False):
-        self.lock.acquire()
-        self.mean_x = x
-        self.mean_y = y
-        self.mean_heading = heading_deg
-        self.mean_confident = confident
-        self.lock.release()
-
-    def show_particles(self, particles):
-        self.lock.acquire()
-        self.particles = copy.deepcopy(particles)
-        self.lock.release()
-
-    def show_robot(self, robot):
-        self.lock.acquire()
-        self.robot = copy.deepcopy(robot)
-        self.lock.release()
+            fill=color, outline='#000000',width=1,tags=tags)
 
     def colorsquare(self, location, color, bg=False, tags=''):
         """Draw a colored square at a given location
@@ -280,35 +261,27 @@ class GUIWindow():
         self.updateflag = True
 
     def update(self):
-        self.lock.acquire()
-        #self.clean_world()
-        self._show_particles(self.particles)
+        
+        #self.grid.lock.acquire()
         self._show_mean(self.mean_x, self.mean_y, self.mean_heading, self.mean_confident)
         
-        self.grid.lock.acquire()
-        self.grid.updated.clear()
-        
-        if 'path' in self.grid.changes:
-            self.drawpath()
-        if 'visited' in self.grid.changes:
-            self.drawnewvisited()
-        if 'allvisited' in self.grid.changes:
-            self.drawallvisited()
-        if 'goals' in self.grid.changes:
-            self.drawgoals()
-        if 'start' in self.grid.changes:
-            self.drawstart()
-        if 'obstacles' in self.grid.changes:
-            self.drawobstacles()
+        # if 'path' in self.grid.changes:
+        #     self.drawpath()
+        # if 'visited' in self.grid.changes:
+        #     self.drawnewvisited()
+        # if 'allvisited' in self.grid.changes:
+        #     self.drawallvisited()
+        # if 'goals' in self.grid.changes:
+        #     self.drawgoals()
+        # if 'start' in self.grid.changes:
+        #     self.drawstart()
+        # if 'obstacles' in self.grid.changes:
+        #     self.drawobstacles()
 
-        self.grid.changes = []
-        self.grid.lock.release()
-        if self.robot != None:
-            self._show_robot(self.robot)
-            time.sleep(0.05)
+        # self.grid.changes = []
+        # self.grid.updated.clear()
+        # self.grid.lock.release()
         self.updated.clear()
-        self.lock.release()
-        # self.updateflag = False
 
     # start GUI thread
     def start(self):

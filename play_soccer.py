@@ -2,6 +2,7 @@ import cozmo
 import cv2
 import math
 import numpy as np
+import queue
 import threading
 import time
 
@@ -18,12 +19,14 @@ from state_machine import State, StateMachine
 global grid, gui
 Map_filename = "map_arena.json"
 grid = CozGrid(Map_filename)
-show_grid = True
+show_grid = False
+show_goal = True
+show_ball = False
+show_camera = False
 if show_grid:
     gui = GUIWindow(grid)
 else:
     gui = None
-show_camera = False
 
 
 async def run(robot: cozmo.robot.Robot):
@@ -39,7 +42,6 @@ async def run(robot: cozmo.robot.Robot):
     robot.camera.image_stream_enabled = True
 
     robot.camera.color_image_enabled = True
-    robot.camera.set_manual_exposure(10, 3.9)
 
     robot.stateMachine = StateMachine(robot)
     await robot.stateMachine.changeState(goto_ball.Search())
@@ -47,63 +49,17 @@ async def run(robot: cozmo.robot.Robot):
     await robot.set_head_angle(cozmo.util.degrees(robot.HEAD_ANGLE)).wait_for_completed()
     await robot.set_lift_height(0, 10000).wait_for_completed()
 
-    # Start particle filter.
-    robot.pf = go_to_goal.ParticleFilter(grid)
-
     while True:
         # Update the delta time since the last frame.
         current_time = time.time()
         robot.delta_time = current_time - robot.prev_time
         robot.prev_time = current_time
 
-        # Continuously remind Cozmo of camera settings (cause sometimes it
-        # resets)
-        robot.camera.set_manual_exposure(10, 3.9)
-
-        event = await robot.world.wait_for(cozmo.camera.EvtNewRawCameraImage, timeout=30)
-
-        # Convert camera image to opencv format
-        opencv_image = cv2.cvtColor(np.asarray(event.image), cv2.COLOR_RGB2BGR)
-        opencv_image = cv2.bilateralFilter(opencv_image, 10, 75, 50)
-        
-        # Masks
-        goal_mask = cv2.inRange(opencv_image, np.array(
-            [25, 25, 125]), np.array([70, 70, 255]))
-        ball_mask =  cv2.inRange(opencv_image, np.array(
-            [0, 0, 0]), np.array([45, 45, 80]))
-        ball_mask = cv2.dilate(ball_mask, None, iterations=2)
-
-
-        # find the ball & goal
-        ball = find_ball.find_ball(robot, opencv_image, ball_mask)
-        # ball = find_ball.find_ball(grayscale_image)
-        guessed_position = find_goal.find_goal(robot, opencv_image, mask)
-        if guessed_position != None:
-            robot.position = guessed_position
-        #goal = find_goal.find_goal(robot, opencv_image, goal_mask)
-
-        robot.grid_position = robot.grid.worldToGridCoords(robot.position)
-        robot.prev_grid_position = robot.grid.worldToGridCoords(
-            robot.prev_position)
-        if robot.gui:
-            robot.gui.show_mean(
-                robot.grid_position[0], robot.grid_position[1], robot.rotation)
-
-        if robot.ball:
-            robot.ball_grid = robot.grid.worldToGridCoords(robot.ball)
-        else:
-            robot.ball_grid = None
-        if robot.prev_ball:
-            robot.prev_ball_grid = robot.grid.worldToGridCoords(
-                robot.prev_ball)
-        else:
-            robot.prev_ball_grid = None
+        await update_sensors(robot)
 
         await robot.stateMachine.update()
 
-        robot.prev_ball = robot.ball
-        robot.prev_position = robot.position
-        robot.last_pose = robot.pose
+        await post_update(robot)
 
         if robot.gui:
             robot.gui.updated.set()
@@ -128,7 +84,7 @@ async def initialize_robot(robot):
     # The turn speed of the robot when turning.
     robot.TURN_SPEED = 20
     # The yaw speed (degrees) of the robot when turning
-    robot.TURN_YAW = 1 / 55 * robot.TURN_SPEED * 2
+    robot.TURN_YAW = robot.TURN_SPEED * 1.38
     # The acceleration of the robot.
     robot.ROBOT_ACCELERATION = 1000
     # The amount of difference between the target and actual angles that the
@@ -211,6 +167,128 @@ async def initialize_robot(robot):
     # The previous grid position of the robot.
     robot.prev_grid_position = (0, 0)
 
+    # The robot's odometry readings for position on the current frame.
+    robot.odom_position = [0, 0]
+    # The robot's odometry readings for rotation on the current frame.
+    robot.odom_rotation = 0
+
+    # Queue for position localization readings.
+    robot.position_queue = queue.Queue()
+    # Queue for rotation localization readings.
+    robot.rotation_queue = queue.Queue()
+    # The number of readings that are saved in queues.
+    robot.QUEUE_SIZE = 5
+
+    robot.add_odom_position = add_odom_position
+    robot.add_odom_rotation = add_odom_rotation
+
+async def update_sensors(robot):
+    """
+    Updates the robot's sensors for localization of itself and the ball.
+
+    Args:
+        robot: The robot object.
+    """
+    # Continuously remind Cozmo of camera settings (cause sometimes it
+    # resets)
+    robot.camera.set_manual_exposure(10, 3.9)
+
+    event = await robot.world.wait_for(cozmo.camera.EvtNewRawCameraImage, timeout=30)
+
+    # Convert camera image to opencv format
+    opencv_image = cv2.cvtColor(np.asarray(event.image), cv2.COLOR_RGB2BGR)
+    opencv_image = cv2.bilateralFilter(opencv_image, 10, 75, 50)
+    
+    # Masks
+    goal_mask = cv2.inRange(opencv_image, np.array(
+        [25, 25, 125]), np.array([70, 70, 255]))
+    ball_mask =  cv2.inRange(opencv_image, np.array(
+        [0, 0, 0]), np.array([45, 45, 80]))
+    ball_mask = cv2.dilate(ball_mask, None, iterations=2)
+
+    # find the ball & goal
+    ball = find_ball.find_ball(robot, opencv_image, ball_mask, show_ball)
+    guessed_position, guessed_rotation = find_goal.find_goal(robot, opencv_image, goal_mask, show_goal)
+    if guessed_position != None:
+        guessed_rotation = math.degrees(guessed_rotation)
+        robot.position_queue.put(guessed_position)
+        if robot.position_queue.qsize() > robot.QUEUE_SIZE:
+            robot.position_queue.get()
+        robot.position = np.mean(list(robot.position_queue.queue), axis = 0)
+
+        robot.rotation_queue.put(guessed_rotation)
+        if robot.rotation_queue.qsize() > robot.QUEUE_SIZE:
+            robot.rotation_queue.get()
+        robot.rotation = np.mean(list(robot.rotation_queue.queue))
+    else:
+        robot.position_queue = queue.Queue()
+        robot.rotation_queue = queue.Queue()
+
+    robot.grid_position = robot.grid.worldToGridCoords(robot.position)
+    robot.prev_grid_position = robot.grid.worldToGridCoords(
+        robot.prev_position)
+
+    if gui:
+        gui.mean_x = robot.grid_position[0]
+        gui.mean_y = robot.grid_position[1]
+        gui.mean_heading = robot.rotation
+
+    if robot.ball:
+        robot.ball_grid = robot.grid.worldToGridCoords(robot.ball)
+    else:
+        robot.ball_grid = None
+    if robot.prev_ball:
+        robot.prev_ball_grid = robot.grid.worldToGridCoords(
+            robot.prev_ball)
+    else:
+        robot.prev_ball_grid = None
+
+async def post_update(robot):
+    """
+    Updates previous poses and odometry after a frame ends.
+
+    Args:
+        robot: The robot to update.
+    """
+    robot.prev_ball = robot.ball
+    robot.prev_position = robot.position
+    robot.last_pose = robot.pose
+
+    current_queue_size = robot.position_queue.qsize()
+    for i in range(current_queue_size):
+        if robot.odom_position != [0, 0]:
+            pos = robot.position_queue.get()
+            pos = np.add(pos, robot.odom_position)
+            robot.position_queue.put(pos)
+        if robot.odom_rotation != 0:
+            rot = robot.rotation_queue.get()
+            rot = rot + robot.odom_rotation
+            robot.rotation_queue.put(rot)
+
+    robot.odom_position = [0, 0]
+    robot.odom_rotation = 0
+
+def add_odom_position(robot, position):
+    """
+    Registers an odometry reading for position.
+
+    Args:
+        robot: The robot with the odometry reading.
+        position: The position reading offset.
+    """
+    robot.position = np.add(robot.position, position)
+    robot.odom_position = np.add(robot.odom_position, position)
+
+def add_odom_rotation(robot, rotation):
+    """
+    Registers an odometry reading for rotation.
+
+    Args:
+        robot: The robot with the odometry reading.
+        rotation: The rotation reading offset.
+    """
+    robot.rotation = np.add(robot.rotation, rotation)
+    robot.odom_rotation = np.add(robot.odom_rotation, rotation)
 
 class CozmoThread(threading.Thread):
     """Thread for robot action execution."""

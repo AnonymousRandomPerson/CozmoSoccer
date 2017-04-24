@@ -26,7 +26,7 @@ def find_goal(robot, opencv_image, mask, debug=True):
 
         Returns [x, y, area] of the goal, and None if no goal is found.
     """
-    show_gui = False
+    show_gui = debug
 
     if show_gui:
         cv2.waitKey(1)
@@ -73,18 +73,22 @@ def find_goal(robot, opencv_image, mask, debug=True):
                     else:
                         top_min_point = min(top_min_point, point, key=lambda p: p[0][0])
                         top_max_point = max(top_max_point, point, key=lambda p: p[0][0])
+            if bottom_min_point == None or top_min_point == None:
+                continue
 
             top_min_point = top_min_point[0]
             top_max_point = top_max_point[0]
             bottom_min_point = bottom_min_point[0]
             bottom_max_point = bottom_max_point[0]
 
-            blockThreshold = 10
+            top_height_difference = abs(top_min_point[1] - top_max_point[1])
+
+            blockThreshold = 15 + top_height_difference
             heightMismatch = abs(bottom_min_point[1] - bottom_max_point[1]) > blockThreshold
             if (heightMismatch and bottom_min_point[1] < bottom_max_point[1]) or abs(top_min_point[0] - bottom_min_point[0]) > blockThreshold:
-                bottom_min_point = (bottom_max_point[0] - (top_max_point[0] - top_min_point[0]), bottom_max_point[1] - (top_max_point[1] - top_min_point[1]))
+                bottom_min_point = (bottom_max_point[0] - (top_max_point[0] - top_min_point[0]) - 2 * (bottom_max_point[0] - top_max_point[0]), bottom_max_point[1] + (top_max_point[1] - top_min_point[1]))
             elif (heightMismatch and bottom_min_point[1] > bottom_max_point[1]) or abs(top_max_point[0] - bottom_max_point[0]) > blockThreshold:
-                bottom_max_point = (bottom_min_point[0] + (top_max_point[0] - top_min_point[0]), bottom_min_point[1] + (top_max_point[1] - top_min_point[1]))
+                bottom_max_point = (bottom_min_point[0] + (top_max_point[0] - top_min_point[0] + 2 * (top_min_point[0] - bottom_min_point[0])), bottom_min_point[1] - (top_max_point[1] - top_min_point[1]))
 
             angle = find_angle(top_min_point, top_max_point)
             if angle > 20:
@@ -114,13 +118,21 @@ def find_goal(robot, opencv_image, mask, debug=True):
             R_2p_1p = np.matmul(np.matmul(inv(R_2_2p), inv(R_1_2)), R_1_1p)
 
             yaw = -math.atan2(R_2p_1p[2, 0], R_2p_1p[0, 0])
-            x, y = tvec[2][0] + 0.5, tvec[0][0] + goal_width / 2
+            x, y = tvec[2][0] + 0.5, tvec[0][0]
 
-            goal_position = (robot.grid.width * robot.grid.scale, robot.grid.height * robot.grid.scale / 2)
-            goal_offset = (-x, y)
+            if yaw > 0:
+                yaw = 2 * math.pi - yaw
+            else:
+                yaw = -yaw
+            goal_position = (robot.grid.width * robot.grid.scale, (robot.grid.height - goal_width) / 2 * robot.grid.scale)
+            yaw_cos = math.cos(yaw)
+            yaw_sin = math.sin(yaw)
+            goal_offset = (x * yaw_cos, x * yaw_sin)
+            goal_offset = np.add(goal_offset, (y * yaw_sin, y * -yaw_cos))
             goal_offset = np.multiply(goal_offset, robot.grid.scale)
             robot_position = np.add(goal_position, goal_offset)
-            print("Robot position:", robot_position, y)
+
+            robot_rotation = yaw - math.pi
 
             if show_gui:
                 # get plot obj points
@@ -133,19 +145,21 @@ def find_goal(robot, opencv_image, mask, debug=True):
                 cv2.line(opencv_image, origin, tuple(img_points[2][0]), (0, 255, 0), thickness = axisThickness)
                 cv2.line(opencv_image, origin, tuple(img_points[3][0]), (255, 0, 0), thickness = axisThickness)
 
-                rectThickness = 2
-                rectColor = (0, 255, 255)
-                cv2.line(opencv_image, tuple(bottom_min_point), tuple(bottom_max_point), rectColor, thickness = rectThickness)
-                cv2.line(opencv_image, tuple(bottom_max_point), tuple(top_max_point), rectColor, thickness = rectThickness)
-                cv2.line(opencv_image, tuple(top_max_point), tuple(top_min_point), rectColor, thickness = rectThickness)
-                cv2.line(opencv_image, tuple(top_min_point), tuple(bottom_min_point), rectColor, thickness = rectThickness)
+                drawRectangle = False
+                if drawRectangle:
+                    rectThickness = 2
+                    rectColor = (0, 255, 255)
+                    cv2.line(opencv_image, tuple(bottom_min_point), tuple(bottom_max_point), rectColor, thickness = rectThickness)
+                    cv2.line(opencv_image, tuple(bottom_max_point), tuple(top_max_point), rectColor, thickness = rectThickness)
+                    cv2.line(opencv_image, tuple(top_max_point), tuple(top_min_point), rectColor, thickness = rectThickness)
+                    cv2.line(opencv_image, tuple(top_min_point), tuple(bottom_min_point), rectColor, thickness = rectThickness)
 
-                cv2.drawContours(opencv_image, [cnt], -1, (255, 0, 0), 1)
+                    cv2.drawContours(opencv_image, [cnt], -1, (255, 0, 0), 1)
                 cv2.imshow('processed img', opencv_image)
-            return robot_position
+            return robot_position, robot_rotation
 
     cv2.imshow('processed img', opencv_image)
-    return None
+    return None, None
 
 
 def find_angle(p_1, p_2):

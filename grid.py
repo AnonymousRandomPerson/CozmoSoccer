@@ -320,9 +320,9 @@ class CozGrid:
         gridCoord = tuple(np.divide(worldCoord, self.scale))
         if self.coordInBounds(gridCoord):
             return gridCoord
-        return getGridCenter()
+        return gridCoord
 
-    def getGridCenter():
+    def getGridCenter(self):
         """
         Gets the coordinates of the center of the grid.
 
