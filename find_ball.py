@@ -41,7 +41,6 @@ def find_ball(robot, opencv_image, mask, debug=False):
     IMG_HEIGHT = opencv_image.shape[0]
     IMG_WIDTH = opencv_image.shape[1]
 
-
     b, contours, hierarchy = cv2.findContours(
         canny_image.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -65,12 +64,12 @@ def find_ball(robot, opencv_image, mask, debug=False):
             continue
 
         center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
-        if circ_rad > 14 and circ_rad < 100:
-            cv2.circle(opencv_image, (int(circ_x), int(circ_y)), int(circ_rad), (0, 255, 255), 2)
+        if circ_rad > 16 and circ_rad < 100:
+            cv2.circle(opencv_image, (int(circ_x), int(circ_y)),
+                       int(circ_rad), (0, 255, 255), 2)
             #cv2.circle(opencv_image, center, 5, (0, 0, 255), -1)
             ## INTENSITY CHECK ##
             # @TODO Could be too strict if ball gets reflected with light.
-            INTENSITY_THRESHOLD = 50
             INTENSITY_MIN_RATE = .55
             count = 0
             tot_pixels = 0
@@ -94,8 +93,8 @@ def find_ball(robot, opencv_image, mask, debug=False):
                     if y >= IMG_HEIGHT or x >= IMG_WIDTH:
                         continue
                     tot_pixels += 1
-                    pixel = opencv_image[y,x]
-                    if pixel[0] < 80 and pixel[1] < 80 and pixel[2] < 125 and pixel[0] > 40 and pixel[1] > 30 and pixel[2] > 40:
+                    pixel = opencv_image[y, x]
+                    if pixel[0] < 86 and pixel[1] < 101 and pixel[2] < 86 and pixel[0] > 24 and pixel[1] > 39 and pixel[2] > 24:
                         count += 1
             if count > INTENSITY_MIN_RATE * tot_pixels:
                 if debug:

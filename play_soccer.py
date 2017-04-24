@@ -219,7 +219,7 @@ async def update_sensors(robot):
     goal_mask = cv2.inRange(opencv_image, np.array(
         [25, 25, 125]), np.array([70, 70, 255]))
     ball_mask = cv2.inRange(opencv_image, np.array(
-        [25, 25, 20]), np.array([70, 255, 70]))
+        [25, 40, 25]), np.array([85, 100, 85]))
     ball_mask = cv2.dilate(ball_mask, None, iterations=1)
 
     # find the ball & goal
