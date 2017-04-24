@@ -60,20 +60,20 @@ def find_goal(robot, opencv_image, mask, debug=True):
             bottom_min_point, bottom_max_point = None, None
             for point in cnt:
                 if point[0][1] > avg_y * 1.1:
-                    if bottom_min_point == None:
+                    if bottom_min_point is None:
                         bottom_min_point = point
                         bottom_max_point = point
                     else:
                         bottom_min_point = min(bottom_min_point, point, key=lambda p: p[0][0])
                         bottom_max_point = max(bottom_max_point, point, key=lambda p: p[0][0])
                 elif point[0][1] < avg_y  * 0.9:
-                    if top_min_point == None:
+                    if top_min_point is None:
                         top_min_point = point
                         top_max_point = point
                     else:
                         top_min_point = min(top_min_point, point, key=lambda p: p[0][0])
                         top_max_point = max(top_max_point, point, key=lambda p: p[0][0])
-            if bottom_min_point == None or top_min_point == None:
+            if bottom_min_point is None or top_min_point is None:
                 continue
 
             top_min_point = top_min_point[0]

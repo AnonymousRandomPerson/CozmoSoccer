@@ -79,7 +79,7 @@ async def initialize_robot(robot):
     # The angle that the robot's head faces.
     robot.HEAD_ANGLE = 5
 
-    # The driving speed of the robot.
+    # The normal driving speed of the robot.
     robot.ROBOT_SPEED = 40
     # The turn speed of the robot when turning.
     robot.TURN_SPEED = 20
@@ -96,7 +96,7 @@ async def initialize_robot(robot):
     # The width of the robot in mm.
     robot.WIDTH = 55
     # The maximum diagonal radius of the robot in mm.
-    robot.RADIUS = (robot.LENGTH ** 2 + robot.WIDTH ** 2) ** 0.5
+    robot.RADIUS = ((robot.LENGTH ** 2 + robot.WIDTH ** 2) / 2) ** 0.5
     # The radius of the ball in mm.
     robot.BALL_RADIUS = 20
     # The length of the goal in mm.
@@ -111,8 +111,13 @@ async def initialize_robot(robot):
     # away from the ball.
     robot.TAN_ANGLE = math.tan(math.radians(robot.ANGLE_OF_VIEW) / 2)
 
+    # The driving speed of the robot when hitting the ball.
+    robot.HIT_SPEED = 1000
+    # The distance (mm) that the robot will back up before hitting the ball.
+    robot.BACK_DISTANCE = robot.RADIUS
+
     # Robot position in millimeters.
-    robot.position = [45, 27.5]
+    robot.position = [152.4 + 27.5, grid.height * grid.scale / 2]
     # Robot rotation in radians.
     robot.rotation = 0
     # The position of the robot in the previous frame.
@@ -166,6 +171,8 @@ async def initialize_robot(robot):
     robot.grid_position = (0, 0)
     # The previous grid position of the robot.
     robot.prev_grid_position = (0, 0)
+    # The position of the goal.
+    robot.goal_position = (robot.grid.width * robot.grid.scale, robot.grid.height / 2 * robot.grid.scale)
 
     # The robot's odometry readings for position on the current frame.
     robot.odom_position = [0, 0]
@@ -208,9 +215,9 @@ async def update_sensors(robot):
 
     # find the ball & goal
     ball = find_ball.find_ball(robot, opencv_image, ball_mask, show_ball)
-    robot.ball = (100, 100, 50)
+    #ball = (160, 100, 70)
     guessed_position, guessed_rotation = find_goal.find_goal(robot, opencv_image, goal_mask, show_goal)
-    if guessed_position != None:
+    if guessed_position is not None:
         guessed_rotation = math.degrees(guessed_rotation)
         guessed_rotation %= math.pi * 2
         robot.position_queue.put(guessed_position)
@@ -227,19 +234,35 @@ async def update_sensors(robot):
         robot.rotation_queue = queue.Queue()
 
     robot.grid_position = robot.grid.worldToGridCoords(robot.position)
-    robot.prev_grid_position = robot.grid.worldToGridCoords(
-        robot.prev_position)
+    robot.prev_grid_position = robot.grid.worldToGridCoords(robot.prev_position)
 
     if gui:
         gui.mean_x = robot.grid_position[0]
         gui.mean_y = robot.grid_position[1]
         gui.mean_heading = robot.rotation
 
-    if robot.ball:
+    if ball:
+        radius = ball[2]
+        x = ball[0]
+        y = ball[1]
+
+        width = len(opencv_image[0])
+        distance = width / 2 / radius * robot.BALL_RADIUS / robot.TAN_ANGLE + robot.CAMERA_OFFSET
+        
+        center = width / 2
+        side_offset = (center - x) / center * robot.ANGLE_OF_VIEW / 2
+
+        rotation_rad = math.radians(robot.rotation)
+        rotation_cos = math.cos(rotation_rad)
+        rotation_sin = math.sin(rotation_rad)
+        ball_offset = np.multiply((rotation_cos, rotation_sin), distance)
+        ball_offset = np.add(ball_offset, np.multiply((rotation_sin, -rotation_cos), side_offset))
+        robot.ball = np.add(robot.position, ball_offset)
         robot.ball_grid = robot.grid.worldToGridCoords(robot.ball)
     else:
+        robot.ball = None
         robot.ball_grid = None
-    if robot.prev_ball:
+    if robot.prev_ball is not None:
         robot.prev_ball_grid = robot.grid.worldToGridCoords(
             robot.prev_ball)
     else:

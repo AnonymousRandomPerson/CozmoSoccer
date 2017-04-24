@@ -228,8 +228,8 @@ class GUIWindow():
             end -- end coordinate
         """
         
-        startcoords = ((start[0] + 0.5) * self.scale, (self.grid.height - (start[1] + 0.5)) * self.scale)
-        endcoords = ((end[0] + 0.5) * self.scale, (self.grid.height - (end[1] + 0.5)) * self.scale)
+        startcoords = ((start[0] + 0.5) * self.grid.scale, (self.grid.height - (start[1] + 0.5)) * self.grid.scale)
+        endcoords = ((end[0] + 0.5) * self.grid.scale, (self.grid.height - (end[1] + 0.5)) * self.grid.scale)
         self.canvas.create_line(startcoords[0], startcoords[1], endcoords[0], endcoords[1], fill = '#DD0000', width = 5, arrow = LAST, tag='path')
 
 
@@ -286,7 +286,7 @@ class GUIWindow():
     # start GUI thread
     def start(self):
         master = Tk()
-        master.wm_title("Particle Filter: Grey/Green - estimated, Red - ground truth")
+        master.wm_title("GUI")
 
         self.canvas = Canvas(master, width = self.grid.width * self.grid.scale, height = self.grid.height * self.grid.scale, bd = 0, bg = '#FFFFFF')
         self.canvas.pack()

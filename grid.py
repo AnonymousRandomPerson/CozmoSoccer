@@ -89,6 +89,27 @@ class CozGrid:
             x, y = self.random_place()
             if self.is_free(x, y):
                 return x, y
+                        
+    def getNeighbors(self, coord):
+        """Get the valid neighbors of a cell and their weights
+
+            Arguments:
+            coord -- grid coordinates of grid cell
+
+            Returns list of (coordinate, weight) pairs
+        """
+        
+        neighbor = []
+        x = coord[0]
+        y = coord[1]
+
+        for i in range(-1,2,1):
+            for j in range(-1,2,1):
+                n = (x + i, y + j)
+                if n != coord and self.coordInBounds(n) and n not in self._obstacles:
+                    neighbor.append((n,math.sqrt(math.pow(i,2) + math.pow(j,2))))
+
+        return neighbor
 
     def checkPath(self):
         """Checks if the current path is valid, and if so returns its length
@@ -141,8 +162,6 @@ class CozGrid:
         self.lock.acquire()
         self._visited.add(coord)
         self._newvisited.append(coord)
-        self.updated.set()
-        self.changes.append('visited')
         self.lock.release()
 
 
@@ -161,8 +180,6 @@ class CozGrid:
         
         self.lock.acquire()
         self._visited = set()
-        self.updated.set()
-        self.changes.append('allvisited')
         self.lock.release()
 
 
