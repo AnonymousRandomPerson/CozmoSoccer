@@ -22,7 +22,6 @@ grid = CozGrid(Map_filename)
 show_grid = True
 show_goal = False
 show_ball = False
-show_camera = False
 do_movement = True
 if show_grid:
     gui = GUIWindow(grid)
@@ -45,7 +44,7 @@ async def run(robot: cozmo.robot.Robot):
     robot.camera.color_image_enabled = True
 
     robot.stateMachine = StateMachine(robot)
-    await robot.stateMachine.changeState(goto_ball.Search())
+    await robot.stateMachine.changeState(goto_ball.HitBall(2.5))
 
     await robot.set_head_angle(cozmo.util.degrees(robot.HEAD_ANGLE)).wait_for_completed()
     await robot.set_lift_height(0, 10000).wait_for_completed()
@@ -217,7 +216,7 @@ async def update_sensors(robot):
     
     # Masks
     goal_mask = cv2.inRange(opencv_image, np.array(
-        [25, 25, 125]), np.array([70, 70, 255]))
+        [25, 25, 170]), np.array([100, 100, 255]))
 
     opencv_image_hsv = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2HSV)
     ball_mask = cv2.inRange(opencv_image_hsv, np.array(
@@ -261,7 +260,7 @@ async def update_sensors(robot):
         gui.mean_y = robot.grid_position[1]
         gui.mean_heading = robot.rotation
 
-    if ball:
+    if ball and robot.localized:
         radius = ball[2]
         x = ball[0]
         y = ball[1]
@@ -277,8 +276,11 @@ async def update_sensors(robot):
         rotation_sin = math.sin(rotation_rad)
         ball_offset = np.multiply((rotation_cos, rotation_sin), distance)
         ball_offset = np.add(ball_offset, np.multiply((rotation_sin, rotation_cos), side_offset))
-        robot.ball = np.add(robot.position, ball_offset)
-        robot.ball_grid = robot.grid.worldToGridCoords(robot.ball)
+        ball_position = np.add(robot.position, ball_offset)
+        ball_grid = robot.grid.worldToGridCoords(ball_position)
+        if robot.grid.coordInBounds(ball_grid):
+            robot.ball = ball_position
+            robot.ball_grid = ball_grid
     if robot.prev_ball is not None:
         robot.prev_ball_grid = robot.grid.worldToGridCoords(
             robot.prev_ball)
@@ -371,5 +373,5 @@ if __name__ == '__main__':
 
         gui.start()
     else:
-        cozmo.run_program(run, use_viewer=show_camera,
+        cozmo.run_program(run, use_viewer=False,
                           force_viewer_on_top=False)

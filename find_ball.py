@@ -70,7 +70,7 @@ def find_ball(robot, opencv_image, mask, debug=False):
             #cv2.circle(opencv_image, center, 5, (0, 0, 255), -1)
             ## INTENSITY CHECK ##
             # @TODO Could be too strict if ball gets reflected with light.
-            INTENSITY_MIN_RATE = .45
+            INTENSITY_MIN_RATE = .7
             count = 0
             tot_pixels = 0
             # Fit a square within detected circle.
@@ -94,7 +94,7 @@ def find_ball(robot, opencv_image, mask, debug=False):
                         continue
                     tot_pixels += 1
                     pixel = opencv_image[y, x]
-                    if pixel[0] < 86 and pixel[1] < 101 and pixel[2] < 86 and pixel[0] > 24 and pixel[1] > 39 and pixel[2] > 24:
+                    if pixel[0] < 100 and pixel[0] > 25:
                         count += 1
             if count > INTENSITY_MIN_RATE * tot_pixels:
                 if debug:

@@ -32,8 +32,8 @@ def find_goal(robot, opencv_image, mask, debug=False):
         cv2.waitKey(1)
 
     canny_image = cv2.Canny(mask, 0, 50, apertureSize=5)
-    # if show_gui:
-    #     cv2.imshow('Canny Goal', canny_image)
+    if show_gui:
+        cv2.imshow('Canny Goal', canny_image)
 
     b, contours, hierarchy = cv2.findContours(
         canny_image.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -90,6 +90,10 @@ def find_goal(robot, opencv_image, mask, debug=False):
 
             angle = find_angle(top_min_point, top_max_point)
             if angle > 20:
+                continue
+
+            mean = np.mean((top_min_point, top_max_point, bottom_min_point, bottom_max_point), axis = 0)
+            if mean[1] < opencv_image.shape[0] / 3:
                 continue
 
             tx_1, ty_1 = top_min_point[0], top_min_point[1]

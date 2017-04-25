@@ -200,16 +200,24 @@ class PathPlan(State):
                 robot.was_driving = True
         else:
             robot.was_driving = False
-            if robot.ball is not None:
-                turn = getTurnDirection(rotation_cos, rotation_sin, rounded_grid, robot.ball_grid)
-                robot.stop_all_motors()
-                if abs(turn) > robot.TURN_THRESHOLD and abs(2 * math.pi - abs(turn)) > robot.TURN_THRESHOLD:
-                    await robot.turn_in_place(radians(turn), num_retries=3).wait_for_completed()
-                    robot.add_odom_rotation(robot, math.degrees(turn))
-                return goto_ball.HitBall()
-            else:
-                await robot.drive_wheels(robot.TURN_SPEED, -robot.TURN_SPEED, robot.ROBOT_ACCELERATION, robot.ROBOT_ACCELERATION)
-                robot.was_turning = True
+
+            turn = getTurnDirection(rotation_cos, rotation_sin, robot.grid_position, robot.target_position)
+            robot.stop_all_motors()
+            if abs(turn) > robot.TURN_THRESHOLD and abs(2 * math.pi - abs(turn)) > robot.TURN_THRESHOLD:
+                await robot.turn_in_place(radians(turn), num_retries=3).wait_for_completed()
+                robot.add_odom_rotation(robot, math.degrees(turn))
+
+            robot.stop_all_motors()
+            distance = grid_distance(robot.grid_position[0], robot.grid_position[1], robot.target_position[0], robot.target_position[1]) * robot.grid.scale
+            await robot.drive_straight(distance_mm(distance), speed_mmps(robot.HIT_SPEED), should_play_anim = False).wait_for_completed()
+            robot.add_odom_forward(robot, distance)
+
+            turn = getTurnDirection(rotation_cos, rotation_sin, robot.grid_position, robot.ball_grid)
+            robot.stop_all_motors()
+            if abs(turn) > robot.TURN_THRESHOLD and abs(2 * math.pi - abs(turn)) > robot.TURN_THRESHOLD:
+                await robot.turn_in_place(radians(turn), num_retries=3).wait_for_completed()
+                robot.add_odom_rotation(robot, math.degrees(turn))
+            return goto_ball.HitBall()
 
 def getTurnDirection(rotation_cos, rotation_sin, current, next):
     """
