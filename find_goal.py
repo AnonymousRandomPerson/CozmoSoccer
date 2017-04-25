@@ -32,8 +32,8 @@ def find_goal(robot, opencv_image, mask, debug=False):
         cv2.waitKey(1)
 
     canny_image = cv2.Canny(mask, 0, 50, apertureSize=5)
-    if show_gui:
-        cv2.imshow('Canny Goal', canny_image)
+    # if show_gui:
+    #     cv2.imshow('Canny Goal', canny_image)
 
     b, contours, hierarchy = cv2.findContours(
         canny_image.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -81,7 +81,7 @@ def find_goal(robot, opencv_image, mask, debug=False):
 
             top_height_difference = abs(top_min_point[1] - top_max_point[1])
 
-            blockThreshold = 15 + top_height_difference
+            blockThreshold = 10 + top_height_difference
             heightMismatch = abs(bottom_min_point[1] - bottom_max_point[1]) > blockThreshold
             if (heightMismatch and bottom_min_point[1] < bottom_max_point[1]) or abs(top_min_point[0] - bottom_min_point[0]) > blockThreshold:
                 bottom_min_point = (bottom_max_point[0] - (top_max_point[0] - top_min_point[0]) - 2 * (bottom_max_point[0] - top_max_point[0]), bottom_max_point[1] + (top_max_point[1] - top_min_point[1]))

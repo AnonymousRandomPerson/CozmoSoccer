@@ -48,8 +48,8 @@ async def hitBall(robot):
     """
     robot.stop_all_motors()
     distance = 2 * robot.BACK_DISTANCE
-    await doActionWithTimeout(robot.drive_straight(distance_mm(distance), speed_mmps(robot.HIT_SPEED)), 5)
-    robot.add_odom_forward(robot, distance)
+    await doActionWithTimeout(robot.drive_straight(distance_mm(distance), speed_mmps(robot.HIT_SPEED), should_play_anim = False), 5)
+    await doActionWithTimeout(robot.drive_straight(distance_mm(-distance), speed_mmps(robot.HIT_SPEED), should_play_anim = False), 5)
 
 
 class StateTemplate(State):
@@ -108,17 +108,26 @@ class Search(State):
         self.move_timer -= 1
         if self.move_timer <= 0:
             distance = robot.BACK_DISTANCE
-            await doActionWithTimeout(robot.drive_straight(distance_mm(distance), speed_mmps(robot.HIT_SPEED)), 5)
+            await doActionWithTimeout(robot.drive_straight(distance_mm(distance), speed_mmps(robot.HIT_SPEED), should_play_anim = False), 5)
             robot.add_odom_forward(robot, distance)
         elif self.turn_timer > 0:
             self.turn_timer -= 1
         else:
             await doActionWithTimeout(robot.turn_in_place(degrees(robot.SEARCH_TURN), num_retries = 3), 0.5)
-            robot.add_odom_rotation(robot, robot.SEARCH_TURN)
+            robot.add_odom_rotation(robot, robot.SEARCH_TURN * .9)
             self.turn_timer = robot.TURN_COUNTER
 
 class HitBall(State):
     """Moves Cozmo's arm to hit the ball."""
+
+    def __init__(self, args=None):
+        """Initializes the state when it is first switched to.
+
+        Args:
+            args: Whether the robot will spin counterclockwise.
+        """
+        self.turned = False
+        self.wait = 5
 
     async def update(self, robot):
         """
@@ -131,17 +140,24 @@ class HitBall(State):
             If the object's state should be changed, returns the class of the new state.
             Otherwise, return None.
         """
-        rotation_rad = math.radians(robot.rotation)
-        turn = planning.getTurnDirection(math.cos(rotation_rad), math.sin(rotation_rad), robot.position, robot.ball)
-        robot.stop_all_motors()
-        await robot.turn_in_place(radians(turn), num_retries = 3).wait_for_completed()
-        robot.add_odom_rotation(robot, math.degrees(turn))
-
-        robot.stop_all_motors()
-        await hitBall(robot)
-        robot.ball = None
-        robot.ball_grid = None
-        return Search()
+        if not self.turned:
+            rotation_rad = math.radians(robot.rotation)
+            turn = planning.getTurnDirection(math.cos(rotation_rad), math.sin(rotation_rad), robot.position, robot.ball)
+            robot.stop_all_motors()
+            await robot.turn_in_place(radians(turn), num_retries = 3).wait_for_completed()
+            robot.add_odom_rotation(robot, math.degrees(turn))
+            robot.ball = None
+            robot.ball_grid = None
+            self.turned = True
+        elif robot.ball is not None or self.wait <= 0:
+            robot.stop_all_motors()
+            await hitBall(robot)
+            robot.ball = None
+            robot.ball_grid = None
+            robot.localized = False
+            return Search()
+        else:
+            self.wait -= 1
 
 
 if __name__ == '__main__':

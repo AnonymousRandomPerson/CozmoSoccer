@@ -19,11 +19,11 @@ from state_machine import State, StateMachine
 global grid, gui
 Map_filename = "map_arena.json"
 grid = CozGrid(Map_filename)
-show_grid = False
+show_grid = True
 show_goal = False
-show_ball = True
+show_ball = False
 show_camera = False
-do_movement = False
+do_movement = True
 if show_grid:
     gui = GUIWindow(grid)
 else:
@@ -218,12 +218,14 @@ async def update_sensors(robot):
     # Masks
     goal_mask = cv2.inRange(opencv_image, np.array(
         [25, 25, 125]), np.array([70, 70, 255]))
-    ball_mask = cv2.inRange(opencv_image, np.array(
-        [25, 40, 25]), np.array([85, 100, 85]))
+
+    opencv_image_hsv = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2HSV)
+    ball_mask = cv2.inRange(opencv_image_hsv, np.array(
+        [25, 0, 0]), np.array([100, 255, 255]))
     ball_mask = cv2.dilate(ball_mask, None, iterations=1)
 
     # find the ball & goal
-    ball = find_ball.find_ball(robot, opencv_image, ball_mask, show_ball)
+    ball = find_ball.find_ball(robot, opencv_image_hsv, ball_mask, show_ball)
     #ball = (160, 100, 70)
     guessed_position, guessed_rotation = find_goal.find_goal(robot, opencv_image, goal_mask, show_goal)
     if guessed_position is not None:
@@ -274,7 +276,7 @@ async def update_sensors(robot):
         rotation_cos = math.cos(rotation_rad)
         rotation_sin = math.sin(rotation_rad)
         ball_offset = np.multiply((rotation_cos, rotation_sin), distance)
-        ball_offset = np.add(ball_offset, np.multiply((rotation_sin, -rotation_cos), side_offset))
+        ball_offset = np.add(ball_offset, np.multiply((rotation_sin, rotation_cos), side_offset))
         robot.ball = np.add(robot.position, ball_offset)
         robot.ball_grid = robot.grid.worldToGridCoords(robot.ball)
     if robot.prev_ball is not None:

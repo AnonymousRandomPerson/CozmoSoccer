@@ -149,7 +149,7 @@ class PathPlan(State):
             changed = True
             self.first = False
 
-        rounded_grid = (int(robot.grid_position[0]), int(robot.grid_position[1]))
+        rounded_grid = (round(robot.grid_position[0]), round(robot.grid_position[1]))
         if changed:
             robot.grid.clearObstacles()
             if robot.ball is not None:
@@ -171,14 +171,14 @@ class PathPlan(State):
             if goal_distance == 0:
                 return
             goal_direction = np.divide(goal_to_ball, goal_distance)
-            goal_direction = np.multiply(goal_direction, robot.RADIUS + robot.BALL_RADIUS)
+            goal_direction = np.multiply(goal_direction, (robot.RADIUS + robot.BALL_RADIUS) * 1.2)
             robot.target_position = np.add(robot.ball, goal_direction)
             robot.target_position = robot.grid.worldToGridCoords(robot.target_position)
 
             if robot.target_position is not None:
                 robot.grid.clearGoals()
                 robot.grid.setStart(rounded_grid)
-                rounded_target = (int(robot.target_position[0]), int(robot.target_position[1]))
+                rounded_target = (round(robot.target_position[0]), round(robot.target_position[1]))
                 robot.grid.addGoal(rounded_target)
                 astar(robot.grid, heuristic)
 
@@ -243,7 +243,7 @@ def getGridPoints(x, y, robot):
     Returns:
         The points on the grid that are blocked by the ball.
     """
-    roundedGrid = (int(x), int(y))
+    roundedGrid = (round(x), round(y))
     total_radius = (robot.RADIUS + robot.BALL_RADIUS) / robot.grid.scale
     scanAmount = math.ceil(total_radius)
     scan = range(-scanAmount, scanAmount + 1)
